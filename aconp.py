@@ -1,7 +1,7 @@
+import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import trange
 import torch
-import numpy as np
 
 class ACO:
     def __init__(self, n_ants, distances, alpha=1, beta=1, evaportation_rate = 0.1, heuristics=None) -> None:
@@ -12,7 +12,7 @@ class ACO:
         self.evaporation_rate = evaportation_rate
         self.distances = distances
         self.heuristics = heuristics if heuristics is not None else 1/distances
-        self.pheromones = torch.ones_like(distances)
+        self.pheromones = np.ones(shape=distances.shape)
 
         self.costs = []
     
@@ -26,14 +26,14 @@ class ACO:
     def run_iteration(self):
         paths, path_costs, _ = self.generate_paths_and_costs() # We disregard the probs here, not needed
         self.update_pheromones(paths, path_costs)
-        self.costs.append(torch.mean(path_costs).item())
+        self.costs.append(np.average(path_costs))
     
     @torch.no_grad()
     def update_pheromones(self, paths, path_costs):
         self.pheromones *= (1-self.evaporation_rate)
         for i in range(self.n_ants):
             ant_path_starts = paths[i]
-            ant_path_ends = torch.roll(ant_path_starts, -1)
+            ant_path_ends = np.roll(ant_path_starts, -1)
             ant_path_cost = path_costs[i]
 
             # Deposit pheromones proportional to the cost of the path
@@ -49,24 +49,24 @@ class ACO:
     @torch.no_grad()
     def generate_path_costs(self, paths):
         hop_starts = paths
-        hop_ends = torch.roll(hop_starts, -1, dims=1)
-        costs = torch.sum(self.distances[hop_starts, hop_ends], dim=1) # #ants x 1
+        hop_ends = np.roll(hop_starts, -1, axis=1)
+        costs = np.sum(self.distances[hop_starts, hop_ends], axis=1) # #ants x 1
         return costs
     
     @torch.no_grad()
     def generate_paths(self, gen_probs=False):
-        current_positions = torch.randint(low=0, high=self.n_nodes, size=(self.n_ants,))
-        valid_mask = torch.ones(size=(self.n_ants, self.n_nodes))
-        valid_mask[torch.arange(self.n_ants), current_positions] = 0
+        current_positions = np.random.randint(low=0, high=self.n_nodes, size=(self.n_ants,))
+        valid_mask = np.ones(shape=(self.n_ants, self.n_nodes))
+        valid_mask[np.arange(self.n_ants), current_positions] = 0
 
         paths = current_positions.reshape(self.n_ants, 1) # #ants x 1
-        path_log_probs = torch.zeros_like(paths) # #ants x 1
+        path_log_probs = np.zeros_like(paths, dtype='float64') # #ants x 1
 
         for _ in range(self.n_nodes-1):
             next_positions, next_log_probs = self.move(current_positions, valid_mask, gen_probs)
-            current_positions = next_positions.squeeze()
-            valid_mask[torch.arange(self.n_ants), current_positions] = 0
-            paths = torch.hstack((paths, current_positions.reshape(self.n_ants, 1))) # #ants x (2, 3, ..., #nodes)
+            current_positions = next_positions
+            valid_mask[np.arange(self.n_ants), current_positions] = 0
+            paths = np.hstack((paths, current_positions.reshape(self.n_ants, 1))) # #ants x (2, 3, ..., #nodes)
             if gen_probs:
                 next_log_probs = next_log_probs.reshape(-1, 1)
                 # print(self.n_ants)
@@ -83,31 +83,27 @@ class ACO:
         move_pheromones = self.pheromones[current_positions]
 
         # Build the probabilities for each of these positions 
-        # print(self.heuristics.shape, self.pheromones.shape, current_positions.shape)
-        # print('shapes', move_heuristics.shape, move_pheromones.shape, valid_mask.shape)
         move_probabilities = move_heuristics ** self.alpha * move_pheromones ** self.beta * valid_mask # #ants x #nodes
-        # print('Shape', move_probabilities.shape)
-
 
         # Generate random indices (moves) based on the probabilities
-        moves = torch.multinomial(move_probabilities, 1)
-
+        possible_indices = np.arange(self.n_nodes)
+        moves = np.apply_along_axis(lambda x: np.random.choice(possible_indices, p=x/x.sum()), axis=1, arr=move_probabilities) #ants x 1
         log_probabilites = None
         if gen_probs:
-            probabilites = move_probabilities[torch.arange(len(move_probabilities)), moves] / torch.sum(move_probabilities, axis=1)
-            log_probabilites = torch.log(probabilites)
+            probabilites = move_probabilities[np.arange(len(move_probabilities)), moves] / move_probabilities.sum(axis=1)
+            log_probabilites = np.log(probabilites)
 
         return moves, log_probabilites
 
 def example_run():
-    size = 20
-    nodes = torch.rand(size=(size, 2))
-    distances = torch.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))
-    distances[torch.arange(size), torch.arange(size)] = 1e9
+    size = 50
+    nodes = np.random.random(size=(size, 2))
+    distances = np.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))
+    distances[np.arange(size), np.arange(size)] = 1e9
 
 
     costs = []
-    for _ in range(3):
+    for _ in range(1):
         sim = ACO(50, distances)
         sim.run(50)
         costs.append(sim.costs)
