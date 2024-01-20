@@ -3,41 +3,26 @@ from tqdm import trange
 import torch
 import numpy as np
 
-class ACO:
-    def __init__(self, n_ants, distances, alpha=1, beta=1, evaportation_rate = 0.1, heuristics=None) -> None:
-        self.n_ants = n_ants
+class BeamSearch:
+    def __init__(self, n_beams, beam_width, distances, heuristics=None) -> None:
+        self.n_beams = n_beams
+        self.beam_width = beam_width
         self.n_nodes = len(distances)
-        self.alpha = alpha
-        self.beta = beta
-        self.evaporation_rate = evaportation_rate
         self.distances = distances
         self.heuristics = heuristics if heuristics is not None else 1/distances
-        self.pheromones = torch.ones_like(distances)
         self.costs = []
     
     @torch.no_grad()
-    def run(self, n_iterations):
-        for _ in (pbar := trange(n_iterations)):
-            self.run_iteration()
-            pbar.set_description(f'{round(self.costs[-1], 2)}')
+    def run(self):
+        for _ in (pbar := trange(self.n_nodes)):
+            self.step()
+
 
     @torch.no_grad()
-    def run_iteration(self):
+    def step(self):
         paths, path_costs, _ = self.generate_paths_and_costs() # We disregard the probs here, not needed
         self.update_pheromones(paths, path_costs)
         self.costs.append(torch.mean(path_costs).item())
-    
-    @torch.no_grad()
-    def update_pheromones(self, paths, path_costs):
-        self.pheromones *= (1-self.evaporation_rate)
-        for i in range(self.n_ants):
-            ant_path_starts = paths[i]
-            ant_path_ends = torch.roll(ant_path_starts, -1)
-            ant_path_cost = path_costs[i]
-
-            # Deposit pheromones proportional to the cost of the path
-            self.pheromones[ant_path_starts, ant_path_ends] += 1./ant_path_cost
-            self.pheromones[ant_path_ends, ant_path_starts] += 1./ant_path_cost
     
 
     def generate_paths_and_costs(self, gen_probs=False):
@@ -55,16 +40,16 @@ class ACO:
     
     
     def generate_paths(self, gen_probs=False):
-        current_positions = torch.randint(low=0, high=self.n_nodes, size=(self.n_ants,))
-        valid_mask = torch.ones(size=(self.n_ants, self.n_nodes))
+        current_positions = torch.randint(low=0, high=self.n_nodes, size=(self.n_beams,))
+        valid_mask = torch.ones(size=(self.n_beams, self.n_nodes))
 
-        paths = current_positions.reshape(self.n_ants, 1) # #ants x 1
+        paths = current_positions.reshape(self.n_beams, 1) # #ants x 1
         path_log_probs = torch.zeros_like(paths) # #ants x 1
         path_log_probs = []
 
         for _ in range(self.n_nodes-1):
             valid_mask = valid_mask.clone()
-            valid_mask[torch.arange(self.n_ants), current_positions] = 0
+            valid_mask[torch.arange(self.n_beams), current_positions] = 0
             next_positions, next_log_probs = self.move(current_positions, valid_mask, gen_probs)
             current_positions = next_positions
             paths = torch.hstack((paths, current_positions.reshape(self.n_ants, 1))) # #ants x (2, 3, ..., #nodes)
