@@ -57,6 +57,7 @@ class GNN(nn.Module):
         edge_attr = instance_data.edge_attr
         edge_index = instance_data.edge_index
 
+        # Get initial node and feature vectors by passing respective values through a linear layer + activation function
         h = self.activation_function(self.h_projection(x))
         e = self.activation_function(self.e_projection(edge_attr))
 

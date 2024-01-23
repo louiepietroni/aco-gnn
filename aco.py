@@ -16,10 +16,14 @@ class ACO:
         self.costs = []
     
     @torch.no_grad()
-    def run(self, n_iterations):
-        for _ in (pbar := trange(n_iterations)):
-            self.run_iteration()
-            pbar.set_description(f'{round(self.costs[-1], 2)}')
+    def run(self, n_iterations, verbose=True):
+        if verbose:
+            for _ in (pbar := trange(n_iterations)):
+                self.run_iteration()
+                pbar.set_description(f'{round(self.costs[-1], 2)}')
+        else:
+            for _ in range(n_iterations):
+                self.run_iteration()
 
     @torch.no_grad()
     def run_iteration(self):
@@ -44,6 +48,14 @@ class ACO:
         paths, path_log_probs = self.generate_paths(gen_probs)
         costs = self.generate_path_costs(paths)
         return paths, costs, path_log_probs
+
+    def generate_best_path(self):
+        paths, costs, _ = self.generate_paths_and_costs()
+        # print(paths.shape, costs.shape)
+        min_index = torch.argmin(costs).item()
+        best_path = paths[min_index]
+        print(best_path.shape)
+        return best_path
 
 
     @torch.no_grad()
