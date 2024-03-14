@@ -204,9 +204,9 @@ def train(network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=
 
 heuristic_network = neuralnetwork.GNN(32, 12)
 # heuristic_network = neuralnetwork.GNN(40, 20)
-problem_size = 100
-k_sparse = 10
-epochs = 10
+problem_size = 50
+k_sparse = 20
+epochs = 25
 iterations_per_epoch = 100
 # iterations_per_epoch = 200
 n_ants = 15
@@ -218,8 +218,9 @@ costs_heu = []
 
 costs = []
 
-exit()
-for _ in range(10):
+
+for _ in range(20):
+    break
     data, distances = generate_problem_instance(problem_size)
     sim = ACO(n_ants, distances)
     sim.run(50)
@@ -227,7 +228,7 @@ for _ in range(10):
 
     # visualiseWeights(data.x, sim.heuristics)
     # visualiseWeights(data.x, sim.pheromones * sim.heuristics)
-    # visualiseWeightsPath(data.x, sim.pheromones * sim.heuristics, sim.generate_best_path())
+    # visualiseWeights(data.x, sim.pheromones * sim.heuristics, sim.generate_best_path())
 
     heuristic_vector = heuristic_network(data)
     heuristics = reshape_heuristic(heuristic_vector, data)
@@ -235,31 +236,35 @@ for _ in range(10):
     sim_heu.run(50)
     costs_heu.append(sim_heu.costs)
 
-    visualiseWeights(data.x, sim_heu.pheromones * sim_heu.heuristics, sim_heu.generate_best_path())
+    # visualiseWeights(data.x, sim_heu.pheromones * sim_heu.heuristics, sim_heu.generate_best_path())
+    # visualiseWeights(data.x, sim.pheromones * sim.heuristics, sim.generate_best_path())
 
     path = solve_tsp(distances)
     dist = generate_path_costs(path, distances)
     costs.append(dist)
 
-    print(dist)
+    # print(dist)
 
     # visualiseWeights(data.x, sim_heu.pheromones * sim_heu.heuristics, torch.tensor(path))
 
 
+# XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# costs_base = np.column_stack(tuple(costs_base))
+# costs_heu = np.column_stack(tuple(costs_heu))
 
-costs_base = np.column_stack(tuple(costs_base))
-costs_heu = np.column_stack(tuple(costs_heu))
+# fig, ax = plt.subplots()
+# ax.plot(np.mean(costs_base, axis=1), label='Base')
+# ax.plot(np.mean(costs_heu, axis=1), label='Heu')
+# ax.axhline(y=sum(costs)/len(costs), label='Perfect')
 
-fig, ax = plt.subplots()
-ax.plot(np.mean(costs_base, axis=1), label='Base')
-ax.plot(np.mean(costs_heu, axis=1), label='Heu')
-ax.axhline(y=sum(costs)/len(costs), label='Perfect')
+# plt.xlabel('No. Iterations')
+# plt.ylabel('Path Length')
+# plt.legend()
+# plt.title(f'TSP {problem_size}')
+# plt.show()
+# XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-plt.xlabel('No. Iterations')
-plt.ylabel('Path Length')
-plt.legend()
-plt.title(f'TSP {problem_size}')
-plt.show()
+
 
 #  # Extrapolate
 # costs_base = []
@@ -289,3 +294,12 @@ plt.show()
 # plt.legend()
 # plt.title(f'TSP Extrapolated')
 # plt.show()
+print(validate(heuristic_network, problem_size, n_ants, k_sparse))
+
+# init best, init avg, post best, post avg
+# tensor([4.0428, 4.6670, 3.9545, 4.4374]) Initial
+# tensor([4.0439, 4.6056, 3.9484, 4.4190]) Initial
+
+# 50
+# tensor([6.2952, 6.7948, 6.0783, 6.5995]) this
+# tensor([6.2545, 6.8034, 6.0745, 6.5833]) og

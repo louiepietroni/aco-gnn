@@ -14,6 +14,9 @@ class ACO:
         self.heuristics = heuristics if heuristics is not None else 1/distances
         self.pheromones = torch.ones_like(distances)
         self.costs = []
+
+        self.heuristic_distances = distances.clone()
+        print(self.distances)
     
     @torch.no_grad()
     def run(self, n_iterations, verbose=True):
@@ -54,7 +57,7 @@ class ACO:
         # print(paths.shape, costs.shape)
         min_index = torch.argmin(costs).item()
         best_path = paths[min_index]
-        print(best_path.shape)
+        # print(best_path.shape)
         return best_path
 
 
@@ -89,8 +92,13 @@ class ACO:
     
         
     def move(self, current_positions, valid_mask, gen_probs=False):
-        # Get the heuristics and pheromones from each of the current positions
+        
+        # Genereate the updated heuristics
+
+
         move_heuristics = self.heuristics[current_positions]
+
+        # Get the heuristics and pheromones from each of the current positions
         move_pheromones = self.pheromones[current_positions]
 
         # Build the probabilities for each of these positions 
@@ -107,14 +115,14 @@ class ACO:
         return moves, log_probabilites
 
 def example_run():
-    size = 20
+    size = 4
     nodes = torch.rand(size=(size, 2))
     distances = torch.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))
     distances[torch.arange(size), torch.arange(size)] = 1e9
 
 
     costs = []
-    for _ in range(3):
+    for _ in range(1):
         sim = ACO(50, distances)
         sim.run(50)
         costs.append(sim.costs)
@@ -127,4 +135,4 @@ def example_run():
     plt.title(f'TSP{size}')
     plt.show()
 
-# example_run()
+example_run()

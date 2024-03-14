@@ -46,7 +46,7 @@ class GNN(nn.Module):
         super().__init__()
         self.depth = depth
         self.layers = nn.ModuleList([GNNLayer(hidden_layer_size, activation_function, aggregation_function) for _ in range(depth)])
-        self.h_projection = nn.Linear(2, hidden_layer_size)
+        self.h_projection = nn.Linear(1, hidden_layer_size)
         self.e_projection = nn.Linear(1, hidden_layer_size)
         self.activation_function = getattr(F, activation_function)
 
@@ -57,7 +57,6 @@ class GNN(nn.Module):
         edge_attr = instance_data.edge_attr
         edge_index = instance_data.edge_index
 
-        # Get initial node and feature vectors by passing respective values through a linear layer + activation function
         h = self.activation_function(self.h_projection(x))
         e = self.activation_function(self.e_projection(edge_attr))
 
