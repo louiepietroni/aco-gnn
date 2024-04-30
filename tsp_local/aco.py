@@ -154,11 +154,11 @@ class ACO:
                 
         return paths
     
-    def two_opt(self, paths):
+    def two_opt(self, paths, rounds=1):
         if paths.dim() != 2:
             paths = paths.unsqueeze(0) # Now we have #some n x #nodes paths
         num_paths = paths.size()[0]
-        for _ in range(3):
+        for _ in range(rounds):
             # store a matrix, for each ant the best improvement, 1st and 2nd #ants x 3
             optimisation_scores = torch.zeros(size=(num_paths,))
             optimisation_data = torch.zeros(size=(num_paths, 2))
@@ -171,6 +171,7 @@ class ACO:
                     second_to = (second_index+1)%self.n_nodes
                     # We have a situation like ... (1st) (1st+1) X ... Z (2nd)   (2nd+1) ... 
                     # We now test the change   ... (1st) (2nd)   Z ... X (1st+1) (2nd+1) ...
+                    # So reverse the order of            \_____________________/
 
                     # Cost change = + 2 new edge costs - 2 old edge costs
                     cost_change = (self.distances[paths[:, first_from], paths[:, second_from]] 
@@ -192,24 +193,44 @@ class ACO:
 
             for ant_index in range(num_paths):
                 if improved_tours[ant_index]:
-                    
+                    # Apply the two opt change for all ants whose tours were improved
                     paths[ant_index, first_tos[ant_index]:second_tos[ant_index]] = paths[ant_index, first_tos[ant_index]:second_tos[ant_index]].flip(0)
 
         return paths
 
 
 def example_run():
-    size = 6
+    size = 25
     nodes = torch.rand(size=(size, 2))
+    # torch.save(nodes, 'temp.pt')
+    nodes = torch.load('temp.pt')
     distances = torch.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))
     distances[torch.arange(size), torch.arange(size)] = 1e9
 
 
-    costs = []
-    for _ in range(1):
-        sim = ACO(5, distances)
-        sim.run(2)
-        costs.append(sim.costs)
+    # costs = []
+    # for _ in range(1):
+    #     sim = ACO(5, distances)
+    #     sim.run(150)
+    #     costs.append(sim.costs)
+    sim = ACO(15, distances)
+    sim.run(100)
+    
+    paths, costs, _ = sim.generate_paths_and_costs()
+    paths = paths[0]
+    visualiseWeights(nodes, sim.pheromones, paths)
+    for _ in range(5):
+        paths = sim.two_opt(paths)[0]
+        visualiseWeights(nodes, sim.pheromones, paths)
+
+        
+        
+    # visualiseWeights(nodes, sim.pheromones * sim.heuristics)
+    # visualiseWeights(nodes, sim.pheromones, f=True)
+    # for _ in range(10):
+    #     sim.run(10)
+    #     # visualiseWeights(nodes, sim.pheromones * sim.heuristics)
+    #     visualiseWeights(nodes, sim.pheromones)
 
     # paths, costs, _ = sim.generate_paths_and_costs()
     # print('Costs before:', torch.mean(costs), torch.mean(sim.generate_path_costs(paths)))
@@ -218,18 +239,19 @@ def example_run():
     # print('Costs after:', torch.mean(sim.generate_path_costs(paths)))
     # exit()
 
-    path = sim.generate_best_path()
-    visualiseWeights(nodes, sim.pheromones * sim.heuristics, path)
-    path = sim.two_opt(path)[0]
-    visualiseWeights(nodes, sim.pheromones * sim.heuristics, path)
+    # path = sim.generate_best_path()
+    # visualiseWeights(nodes, sim.pheromones * sim.heuristics, path)
+    # path = sim.two_opt(path, 1)[0]
+    # visualiseWeights(nodes, sim.pheromones * sim.heuristics, path)
     
-    costs = np.column_stack(tuple(costs))
-    fig, ax = plt.subplots()
-    ax.plot(np.mean(costs, axis=1), label='average')
-    plt.legend()
-    plt.xlabel('No. Iterations')
-    plt.ylabel('Path Length')
-    plt.title(f'TSP{size}')
+    # costs = np.column_stack(tuple(costs))
+    # fig, ax = plt.subplots()
+    # ax.plot(np.mean(costs, axis=1), label='average')
+    # plt.legend()
+    # plt.xlabel('No. Iterations')
+    # plt.ylabel('Path Length')
+    # plt.title(f'TSP{size}')
     # plt.show()
 
-# example_run()
+
+example_run()

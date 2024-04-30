@@ -78,7 +78,7 @@ def sparsify(items, p):
     # Returns each item in items with probability of p
     return [item for item in items if torch.rand(size=(1,)).item() < p]
 
-def generate_problem_instance(size, p=0.05):
+def generate_problem_instance(size, p=0.25):
     # Creates n nodes, with edges between them
     all_possible_pairs = torch.combinations(torch.arange(size)).tolist()
     random_pairs = torch.tensor(sparsify(all_possible_pairs, p)) + 1 # +1 as now node 0 will be a dummy node
@@ -103,6 +103,7 @@ def convert_to_pyg_format(distances):
     # edge_data = distances.to_sparse()
     adjacency_matix = torch.ones_like(distances)
     adjacency_matix[distances!=1] = 1e9 # Locations with no edge edge = 1, no edge = -1
+    adjacency_matix[distances!=1] = -1 # Locations with no edge edge = 1, no edge = -1
     # NOTE: Above with -1, 1e-9, 1e9 try out!
     # adjacency_matix[distances==1] = -1 # Locations with edge
     # print(adjacency_matix)
@@ -131,4 +132,4 @@ def load_dataset(dataset_type, problem_size):
     return dataset
 
 
-# generate_dataset('val', 20, 20)
+# generate_dataset('test', 30, 25)

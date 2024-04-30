@@ -98,7 +98,8 @@ def convert_to_pyg_format(data, weights, values, k_sparse=None):
     edge_data = distances.to_sparse()
     edge_index = edge_data.indices()
     edge_attr = edge_data.values().reshape(-1, 1)
-    edge_attr[edge_attr != edge_attr] = 1e9
+    # edge_attr[edge_attr != edge_attr] = 1e9
+    edge_attr[edge_attr != edge_attr] = -1
     data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
     return data
 
@@ -121,4 +122,4 @@ def load_dataset(dataset_type, problem_size):
 
     return dataset
 
-# generate_dataset('val', 100, 20)
+# generate_dataset('test', 50, 20)

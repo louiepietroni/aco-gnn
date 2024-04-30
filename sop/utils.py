@@ -68,7 +68,7 @@ def sparsify(items, p):
     return [item for item in items if random.random() < p]
 
 
-def generate_problem_instance(size, precendence_probability):
+def generate_problem_instance(size, precendence_probability=0.1):
     nodes = torch.rand(size=(size, 2))
     constraints = generate_constraints(size, precendence_probability)
     return nodes, constraints
@@ -93,12 +93,39 @@ def generate_dataset(dataset_type, problem_size, dataset_size):
     torch.save(dataset, f'datasets/sop/{problem_size}/{dataset_type}.pt')
     print(f'Generated {dataset_size} instances in: datasets/sop/{problem_size}/{dataset_type}.pt')
 
+def generate_variable_dataset(dataset_type, min_problem_size, max_problem_size, dataset_size_per, step=5):
+    instances = []
+    for problem_size in range(min_problem_size, max_problem_size + step, step):
+        current_sized_instances = [generate_problem_instance(problem_size) for _ in range(dataset_size_per)]
+        instances += current_sized_instances
+    return instances
+    dataset = torch.vstack(instances)
+    print(dataset.size())
+    Path(f'datasets/sop/{min_problem_size}-{max_problem_size}').mkdir(parents=True, exist_ok=True)
+    torch.save(dataset, f'datasets/sop/{min_problem_size}-{max_problem_size}/{dataset_type}.pt')
+    print(f'Generated {len(instances)} instances in: datasets/sop/{min_problem_size}-{max_problem_size}/{dataset_type}.pt')
+
 def load_dataset(dataset_type, problem_size):
     dataset_path = f'datasets/sop/{problem_size}/{dataset_type}.pt'
     assert Path(dataset_path).is_file(), 'No matching dataset exists, you can create one with generate_dataset()'
     dataset = torch.load(dataset_path)
     return dataset
 
+def load_variable_dataset(dataset_type, min_problem_size, max_problem_size, step=5, quantity=5):
+    dataset_path = f'datasets/sop/{min_problem_size}-{max_problem_size}/{dataset_type}.pt'
+    assert Path(dataset_path).is_file(), 'No matching dataset exists, you can create one with generate_dataset()'
+    dataset = torch.load(dataset_path)
+    data = []
+    low = 0
+    for problem_size in range(min_problem_size, max_problem_size + step, step):
+        for _ in range(quantity):
+            data.append(dataset[low:low+problem_size])
+            low += problem_size
+
+    return data
+
+
+generate_variable_dataset('test', 20, 50, 5)
 
 # size = 5
 # nodes, precedences = generate_problem_instance(size, 1)

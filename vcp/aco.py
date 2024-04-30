@@ -90,27 +90,13 @@ class ACO:
         mask[valid_cover, 0] = 1 # Ants which have covered every edge can visit the depot
         return mask
     
-    # def update_valid_colour_mask(self, colour_mask, current_positions):
-    #     # If we're at the depot, reset to allow all nodes
-    #     colour_mask[current_positions == 0, :] = 1
-    #     # Any nodes which have edges to where we are now can't be visited
-    #     # print(colour_mask)
-    #     for i in range(self.n_ants):
-    #         colour_mask[i] = colour_mask[i] * self.constraints[current_positions[i]]
-        
-    #     # print(colour_mask)
-    #     return colour_mask
-
-        
     
     def done(self, covered_edges, current_positions):
         # Want to verify we've covered every edge
         covered_all_edges = (covered_edges == True).all()
         at_depot = (current_positions == 0).all()
         return covered_all_edges and at_depot
-        visited_all_locations = (valid_mask[:, 1:] == 0).all()
-        all_at_depot = (current_positions[:] == 0).all()
-        return visited_all_locations and all_at_depot
+
     
     def update_capacity_mask(self, current_positions, used_capacity):
         # Any nodes which have edges to where we are now can't be visited
@@ -123,10 +109,7 @@ class ACO:
         remaining_capacity = self.capacity - used_capacity # (n_ants,)
         remaining_capacity_repeat = remaining_capacity.repeat(1, self.n_nodes) # (n_ants, p_size)
         demand_repeat = self.sizes.t().repeat(self.n_ants, 1) # (n_ants, p_size)
-        # print(self.demands.size())
-        # print(remaining_capacity.size())
-        # print(remaining_capacity_repeat.size())
-        # print(demand_repeat.size())
+
         capacity_mask[demand_repeat > remaining_capacity_repeat] = 0
         
         return used_capacity, capacity_mask

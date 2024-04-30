@@ -55,8 +55,46 @@ def generate_dataset(dataset_type, problem_size, dataset_size):
     torch.save(dataset, f'datasets/{problem_size}/{dataset_type}.pt')
     print(f'Generated {dataset_size} instances in: datasets/{problem_size}/{dataset_type}.pt')
 
+def generate_variable_dataset(dataset_type, min_problem_size, max_problem_size, dataset_size_per, step=5):
+    instances = []
+    for problem_size in range(min_problem_size, max_problem_size + step, step):
+        current_sized_instances = [generate_problem_instance(problem_size) for _ in range(dataset_size_per)]
+        instances += current_sized_instances
+    dataset = torch.vstack(instances)
+    print(dataset.size())
+    Path(f'datasets/{min_problem_size}-{max_problem_size}').mkdir(parents=True, exist_ok=True)
+    torch.save(dataset, f'datasets/{min_problem_size}-{max_problem_size}/{dataset_type}.pt')
+    print(f'Generated {len(instances)} instances in: datasets/{min_problem_size}-{max_problem_size}/{dataset_type}.pt')
+
 def load_dataset(dataset_type, problem_size):
     dataset_path = f'datasets/{problem_size}/{dataset_type}.pt'
     assert Path(dataset_path).is_file(), 'No matching dataset exists, you can create one with generate_dataset()'
     dataset = torch.load(dataset_path)
     return dataset
+
+def load_variable_dataset(dataset_type, min_problem_size, max_problem_size, step=5, quantity=5):
+    dataset_path = f'datasets/{min_problem_size}-{max_problem_size}/{dataset_type}.pt'
+    assert Path(dataset_path).is_file(), 'No matching dataset exists, you can create one with generate_dataset()'
+    dataset = torch.load(dataset_path)
+    data = []
+    low = 0
+    for problem_size in range(min_problem_size, max_problem_size + step, step):
+        for _ in range(quantity):
+            data.append(dataset[low:low+problem_size])
+            low += problem_size
+
+    return data
+
+def load_variable_sols(dataset_type, min_problem_size, max_problem_size):
+    dataset_path = f'datasets/{min_problem_size}-{max_problem_size}/{dataset_type}.pt'
+    assert Path(dataset_path).is_file(), 'No matching dataset exists, you can create one with generate_dataset()'
+    sols = torch.load(dataset_path)
+    return sols
+
+
+# a = torch.tensor([[2], [3]])
+# print(a.size())
+# print(torch.unsqueeze(a, dim=0).size())
+
+# generate_dataset('test', 100, 50)
+# generate_variable_dataset('train', 20, 50, 1000)

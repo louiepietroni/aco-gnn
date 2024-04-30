@@ -135,6 +135,7 @@ def train(network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=
         validation_data.append(validate(network, problem_size, n_ants, k_sparse))
     validation_data = torch.stack(validation_data)
     plot_validation_data(validation_data)
+    
 heuristic_network = neuralnetwork.GNN(32, 12)
 # heuristic_network = neuralnetwork.GNN(40, 20)
 problem_size = 100
@@ -144,52 +145,94 @@ iterations_per_epoch = 100
 # iterations_per_epoch = 200
 n_ants = 20
 
-train(heuristic_network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=k_sparse)
+# train(heuristic_network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=k_sparse)
 print(validate(heuristic_network, problem_size, n_ants, k_sparse))
 # tensor([40.7195, 41.1087, 41.1124, 41.3281])
 
 
 heuristic_network.eval()
+costs_model_new = []
 costs_base = []
-costs_heu = []
-costs = []
-for _ in range(20):
-    data = generate_problem_instance(problem_size)
-    weights, values = get_distances(data)
-    pyg_data = convert_to_pyg_format(data, weights, values)
+test_dataset = load_dataset('test', problem_size)
+SIGNIFICANCE_RUNS = 15
+# for _ in range(10):
+#     data = generate_problem_instance(problem_size)
+for _ in range(SIGNIFICANCE_RUNS):
+    continue
+    run_costs_model_new = []
+    run_costs_base = []
+    for data in test_dataset:
+        weights, values = get_distances(data)
+        pyg_data = convert_to_pyg_format(data, weights, values)
 
+        # sim = ACO(n_ants, weights, values)
+        # sim.run(50)
+        # run_costs_base.append(sim.costs)
 
-    sim = ACO(n_ants, weights, values)
-    sim.run(50)
-    costs_base.append(sim.costs)
-    # print('base best', len(sim.generate_best_path()))
+        heuristic_vector = heuristic_network(pyg_data)
+        heuristics = reshape_heuristic(heuristic_vector, pyg_data)
+        sim_heu = ACO(n_ants, weights, values, heuristics=heuristics)
+        sim_heu.run(50)
+        run_costs_model_new.append(sim_heu.costs)
+    
+    costs_model_new.append(torch.tensor(run_costs_model_new).mean(dim=0).tolist())
+    # costs_base.append(torch.tensor(run_costs_base).mean(dim=0).tolist())
 
-    # visualiseWeights(data.x, sim.heuristics)
-    # visualiseWeights(data.x, sim.pheromones * sim.heuristics)
-    # visualiseWeights(distances, sim.pheromones * sim.heuristics, sim.generate_best_path())
+# torch.save(torch.tensor(costs_model_new), 'results/kp/run-model-new.pt')
+# torch.save(torch.tensor(costs_base), 'results/kp/run-base.pt')
 
-    heuristic_vector = heuristic_network(pyg_data)
-    heuristics = reshape_heuristic(heuristic_vector, pyg_data)
-    sim_heu = ACO(n_ants, weights, values, heuristics=heuristics)
-    sim_heu.run(50)
-    costs_heu.append(sim_heu.costs)
-    # print('heur best', len(sim_heu.generate_best_path()))
+# torch.save(torch.tensor(costs_base), 'results/kp/temp-base.pt')
+# torch.save(torch.tensor(costs_heu), 'results/kp/temp-model-new.pt')
 
-    # visualiseWeights(distances, sim_heu.pheromones * sim_heu.heuristics, sim_heu.generate_best_path())
+data_model_new = torch.load('results/kp/run-model-new.pt')
+data_model = torch.load('results/kp/run-model.pt')
+data_base = torch.load('results/kp/run-base.pt')
 
+# print(data_model.size())
 
-
-costs_base = np.column_stack(tuple(costs_base))
-costs_heu = np.column_stack(tuple(costs_heu))
 
 fig, ax = plt.subplots()
-ax.plot(np.mean(costs_base, axis=1), label='Base')
-ax.plot(np.mean(costs_heu, axis=1), label='Heu')
+x = [i for i in range(1, 51)]
 
-plt.xlabel('No. Iterations')
-plt.ylabel('Total Value')
+# mean = data_base.mean(dim=0)
+# std = data_base.std(dim=0)
+# delta = 2.131 * std / (SIGNIFICANCE_RUNS ** 0.5)
+# ax.plot(x, mean, label=f'Expert heuristic')
+# ax.fill_between(x, (mean-delta), (mean+delta), alpha=.5)
+# print(f'Updated architecture {mean}')
+
+mean = data_model_new.mean(dim=0)
+std = data_model_new.std(dim=0)
+delta = 2.131 * std / (SIGNIFICANCE_RUNS ** 0.5)
+ax.plot(x, mean)
+ax.fill_between(x, (mean-delta), (mean+delta), alpha=.0)
+print(f'Updated architecture {mean}')
+
+mean = data_model_new.mean(dim=0)
+std = data_model_new.std(dim=0)
+delta = 2.131 * std / (SIGNIFICANCE_RUNS ** 0.5)
+ax.plot(x, mean, label=f'Updated architecture')
+ax.fill_between(x, (mean-delta), (mean+delta), alpha=.5)
+print(f'Updated architecture {mean}')
+
+mean = data_model.mean(dim=0)
+std = data_model.std(dim=0)
+delta = 2.131 * std / (SIGNIFICANCE_RUNS ** 0.5)
+ax.plot(x, mean, label=f'Orginial architecture')
+ax.fill_between(x, (mean-delta), (mean+delta), alpha=.5)
+print(f'Updated architecture {mean}')
+
+# costs_base = np.column_stack(tuple(costs_base))
+# costs_heu = np.column_stack(tuple(costs_heu))
+
+# fig, ax = plt.subplots()
+# ax.plot(np.mean(costs_base, axis=1), label='Base')
+# ax.plot(np.mean(costs_heu, axis=1), label='Heu')
+
+plt.xlabel('ACO iterations')
+plt.ylabel('Objective value')
 plt.legend()
-plt.title(f'KP {problem_size}')
+plt.title(f'Objective value against ACO rounds for KP')
 plt.show()
 
 #  # Extrapolate

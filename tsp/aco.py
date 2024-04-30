@@ -14,6 +14,7 @@ class ACO:
         self.heuristics = heuristics if heuristics is not None else 1/distances
         self.pheromones = torch.ones_like(distances)
         self.costs = []
+        self.best_cost = torch.inf
     
     @torch.no_grad()
     def run(self, n_iterations, verbose=True):
@@ -28,8 +29,14 @@ class ACO:
     @torch.no_grad()
     def run_iteration(self):
         paths, path_costs, _ = self.generate_paths_and_costs() # We disregard the probs here, not needed
+        self.most_recent_paths = paths
         self.update_pheromones(paths, path_costs)
         self.costs.append(torch.mean(path_costs).item())
+        best_iteration_cost = torch.min(path_costs).item()
+        if best_iteration_cost < self.best_cost:
+            self.best_path = paths[path_costs.tolist().index(best_iteration_cost)]
+        self.best_cost = min(best_iteration_cost, self.best_cost)
+
     
     @torch.no_grad()
     def update_pheromones(self, paths, path_costs):
@@ -42,6 +49,7 @@ class ACO:
             # Deposit pheromones proportional to the cost of the path
             self.pheromones[ant_path_starts, ant_path_ends] += 1./ant_path_cost
             self.pheromones[ant_path_ends, ant_path_starts] += 1./ant_path_cost
+        self.pheromones += 1e-9
     
 
     def generate_paths_and_costs(self, gen_probs=False):

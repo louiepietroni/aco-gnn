@@ -13,10 +13,11 @@ class ACO:
         self.beta = beta
         self.evaporation_rate = evaportation_rate
         self.distances = distances
-        self.heuristics = heuristics if heuristics is not None else 1/(distances+1e-10)
+        self.heuristics = heuristics + 1e-10 if heuristics is not None else 1/(distances+1e-10)
         self.pheromones = torch.ones_like(distances)
         self.costs = []
         self.local_costs = []
+        self.best_cost = torch.inf
     
     @torch.no_grad()
     def run(self, n_iterations, verbose=True):
@@ -34,9 +35,12 @@ class ACO:
         self.update_pheromones(paths, path_costs)
         self.costs.append(torch.mean(path_costs).item())
 
-        local_paths = self.two_opt(paths)
-        local_path_costs = self.generate_path_costs(local_paths)
-        self.local_costs.append(torch.mean(local_path_costs).item())
+        # local_paths = self.two_opt(paths)
+        # local_path_costs = self.generate_path_costs(local_paths)
+        # self.local_costs.append(torch.mean(local_path_costs).item())
+
+        best_iteration_cost = torch.min(path_costs).item()
+        self.best_cost = min(best_iteration_cost, self.best_cost)
     
     @torch.no_grad()
     def update_pheromones(self, paths, path_costs):
@@ -76,13 +80,15 @@ class ACO:
         # print(hop_ends)
         # print(self.distances[hop_starts[:, :-1], hop_ends[:, :-1]])
         return torch.sum(self.distances[hop_starts[:, :-1], hop_ends[:, :-1]], dim=1)
-
+    
     def update_mask(self, mask, current_positions):
-        mask[torch.arange(self.n_ants), current_positions] = 0 # Places just visited now not valid
-        mask[:, 0] = 1 # Can always visit the dummy node
-        inidices_at_depot = current_positions == 0
-        # mask[inidices_at_depot, 0] = 0 # Except if we're at the dummy node now
-        mask[(current_positions==0) * (mask[:, 1:]!=0).any(dim=1), 0] = 0 # logic
+        # Locations just visited no longer valid
+        mask[torch.arange(self.n_ants), current_positions] = 0
+        # Completed if can't go to any other node and are at dummy node
+        completed_agents = (mask[:, 1:]==0).all(dim=1) * (current_positions==0)
+        valid_to_dummy = torch.logical_or(completed_agents, (current_positions != 0))
+        # Completed agents and those not at dummy node now can always visit the dummy node
+        mask[valid_to_dummy, 0] = 1
         return mask
     
     def done(self, valid_mask, current_positions):

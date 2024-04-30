@@ -4,6 +4,7 @@ import networkx as nx
 from torch_geometric.data import Data
 from torch_geometric.datasets import GNNBenchmarkDataset
 from pathlib import Path
+from scipy.optimize import linear_sum_assignment
 
 def visualiseWeights(nodes, weights, path=None):
     # Visualise the weights between edges in a graph
@@ -96,6 +97,18 @@ def generate_dataset(dataset_type, problem_size, dataset_size):
     torch.save(dataset, f'datasets/ap/{problem_size}/{dataset_type}.pt')
     print(f'Generated {dataset_size} instances in: datasets/ap/{problem_size}/{dataset_type}.pt')
 
+def generate_variable_dataset(dataset_type, min_problem_size, max_problem_size, dataset_size_per, step=5):
+    instances = []
+    for problem_size in range(min_problem_size, max_problem_size + step, step):
+        current_sized_instances = [generate_problem_instance(problem_size) for _ in range(dataset_size_per)]
+        instances += current_sized_instances
+    return instances
+    dataset = torch.vstack(instances)
+    print(dataset.size())
+    Path(f'datasets/ap/{min_problem_size}-{max_problem_size}').mkdir(parents=True, exist_ok=True)
+    torch.save(dataset, f'datasets/ap/{min_problem_size}-{max_problem_size}/{dataset_type}.pt')
+    print(f'Generated {len(instances)} instances in: datasets/ap/{min_problem_size}-{max_problem_size}/{dataset_type}.pt')
+
 
 def load_dataset(dataset_type, problem_size):
     dataset_path = f'datasets/ap/{problem_size}/{dataset_type}.pt'
@@ -103,4 +116,31 @@ def load_dataset(dataset_type, problem_size):
     dataset = torch.load(dataset_path)
 
     return dataset
+
+def load_variable_dataset(dataset_type, min_problem_size, max_problem_size, step=5, quantity=5):
+    dataset_path = f'datasets/ap/{min_problem_size}-{max_problem_size}/{dataset_type}.pt'
+    assert Path(dataset_path).is_file(), 'No matching dataset exists, you can create one with generate_dataset()'
+    dataset = torch.load(dataset_path)
+    data = []
+    low = 0
+    for problem_size in range(min_problem_size, max_problem_size + step, step):
+        for _ in range(quantity):
+            data.append(dataset[low:low+problem_size])
+            low += problem_size
+
+    return data
+
+def solve_dataset(dataset):
+    sols = []
+    for instance in dataset:
+        clean_instance = instance[1:, 1:] # Remove dummy node
+        row_ind, col_ind = linear_sum_assignment(clean_instance) # Generate assignment solution
+        instance_cost = clean_instance[row_ind, col_ind].sum() # Calcualte cost
+        sols.append(instance_cost)
+    return sols
+
+
+# generate_variable_dataset('test', 10, 100, 50)
+
+
 

@@ -82,11 +82,13 @@ class ACO:
     
 
     def update_mask(self, mask, current_positions):
-        mask[torch.arange(self.n_ants), current_positions] = 0 # Places just visited now not valid
-        mask[:, 0] = 1 # Can always visit the depot
-        inidices_at_depot = current_positions == 0
-        # mask[inidices_at_depot, 0] = 0 # Except if we're at the depot now
-        mask[(current_positions==0) * (mask[:, 1:]!=0).any(dim=1), 0] = 0 # logic
+        # Locations just visited no longer valid
+        mask[torch.arange(self.n_ants), current_positions] = 0
+        # Completed if can't go to any other node and are at dummy node
+        completed_agents = (mask[:, 1:]==0).all(dim=1) * (current_positions==0)
+        valid_to_dummy = torch.logical_or(completed_agents, (current_positions != 0))
+        # Completed agents and those not at dummy node now can always visit the dummy node
+        mask[valid_to_dummy, 0] = 1
         return mask
     
     def done(self, valid_mask, current_positions):

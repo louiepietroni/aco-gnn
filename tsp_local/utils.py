@@ -6,7 +6,7 @@ from torch_geometric.datasets import GNNBenchmarkDataset
 from pathlib import Path
 
 
-def visualiseWeights(nodes, weights, path=None):
+def visualiseWeights(nodes, weights, path=None, f=False):
     # Visualise the weights between edges in a graph
     nodes = nodes
     weights = weights.detach()
@@ -29,14 +29,16 @@ def visualiseWeights(nodes, weights, path=None):
 
     # List of weight values, but normalised
     weight_values = [normaliser * (weight[2] - min_weight) for weight in weighted_edges]
+    if f:
+        weight_values = [z[2] for z in weighted_edges]
 
     # Draw the graph
     plt.figure(figsize=(7, 7))
-    nx.draw_networkx_nodes(G, pos, node_size=25, node_color='lightblue')
-    # nx.draw_networkx_edges(G, pos, edgelist=weight_values, edge_color='gray', width=2, alpha=[weight[2] for weight in weight_values])
-    nx.draw_networkx_edges(G, pos, edgelist=weighted_edges, edge_color='gray', width=weight_values)
+    nx.draw_networkx_nodes(G, pos, node_size=25, node_color='black')
+    ## nx.draw_networkx_edges(G, pos, edgelist=weight_values, edge_color='gray', width=2, alpha=[weight[2] for weight in weight_values])
+    # nx.draw_networkx_edges(G, pos, edgelist=weighted_edges, edge_color='gray', width=weight_values)
 
-    nx.draw_networkx_labels(G, pos, {i: i for i in range(n_nodes)})
+    # nx.draw_networkx_labels(G, pos, {i: i for i in range(n_nodes)})
     
     if path is not None:
         path = path.detach().tolist()

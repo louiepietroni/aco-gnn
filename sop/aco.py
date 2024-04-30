@@ -16,6 +16,7 @@ class ACO:
         self.heuristics = heuristics if heuristics is not None else 1/distances
         self.pheromones = torch.ones_like(distances)
         self.costs = []
+        self.best_cost = torch.inf
     
     def generate_precendence_matrix(self, precedences):
         # #nodes x #nodes, what nodes we 'unlock' by going to this node
@@ -41,6 +42,9 @@ class ACO:
         paths, path_costs, _ = self.generate_paths_and_costs() # We disregard the probs here, not needed
         self.update_pheromones(paths, path_costs)
         self.costs.append(torch.mean(path_costs).item())
+
+        best_iteration_cost = torch.min(path_costs).item()
+        self.best_cost = min(best_iteration_cost, self.best_cost)
     
     @torch.no_grad()
     def update_pheromones(self, paths, path_costs):
@@ -143,14 +147,14 @@ class ACO:
 
         return moves, log_probabilites
 
-def example_run():
-    size = 20
-    nodes, precedences = generate_problem_instance(size, 0.01)
-    distances = torch.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))
-    distances[torch.arange(size), torch.arange(size)] = 1e9
-    print(precedences)
-    sim = ACO(3, distances, precedences)
-    sim.run(20)
-    visualiseWeights(nodes, sim.heuristics*sim.pheromones, precedences=precedences, path=sim.generate_best_path())
+# def example_run():
+#     size = 20
+#     nodes, precedences = generate_problem_instance(size, 0.01)
+#     distances = torch.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))
+#     distances[torch.arange(size), torch.arange(size)] = 1e9
+#     print(precedences)
+#     sim = ACO(3, distances, precedences)
+#     sim.run(20)
+#     visualiseWeights(nodes, sim.heuristics*sim.pheromones, precedences=precedences, path=sim.generate_best_path())
 
 # example_run()

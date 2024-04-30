@@ -16,7 +16,7 @@ class ACO:
         self.clauses = clauses
         # Our basic heuristic is either:
         # 1: Heuristic for nodes which DON'T share a clause with this variable
-        self.heuristics = heuristics if heuristics is not None else 1-distances + 0.1
+        self.heuristics = heuristics+1e-7 if heuristics is not None else 1-distances + 0.1
         # 2: Heuristic for nodes which share a clause for the negation of this variable
         # self.heuristics = heuristics if heuristics is not None else 1-distances + 0.1
         # 3: Heuristics for number of clauses a variable is in
@@ -178,13 +178,13 @@ class ACO:
 
         # Generate random indices (moves) based on the probabilities
         # print(move_probabilities)
-        try:
-            moves = torch.multinomial(move_probabilities, 1).squeeze()
-        except RuntimeError:
-            print(move_heuristics)
-            print(move_pheromones)
-            print(valid_mask)
-            print(move_probabilities)
+        # try:
+        moves = torch.multinomial(move_probabilities, 1).squeeze()
+        # except RuntimeError:
+        #     print(move_heuristics)
+        #     print(move_pheromones)
+        #     print(valid_mask)
+        #     print(move_probabilities)
 
         log_probabilites = None
         if gen_probs:

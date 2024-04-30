@@ -102,4 +102,5 @@ def load_dataset(dataset_type, problem_size):
     return dataset
 
 
-# generate_dataset('val', 100, 25)
+# generate_dataset('test', 50, 25)
+# generate_dataset('test', 100, 15)

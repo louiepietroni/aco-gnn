@@ -5,7 +5,8 @@ from torch_geometric.data import Data
 import matplotlib.pyplot as plt
 import neuralnetwork
 from tqdm import trange
-from cvrputils import generate_dataset, visualiseWeights, load_dataset, generate_problem_instance
+import random
+from cvrputils import generate_dataset, visualiseWeights, load_dataset, generate_problem_instance, generate_variable_dataset
 
 
 def evaluate_iteration(network, instance_data, distances, demands, n_ants, k_sparse=None):
@@ -29,6 +30,18 @@ def evaluate_iteration(network, instance_data, distances, demands, n_ants, k_spa
 
     # return initial_best_tour, initial_mean_tour, simulated_best_tour, simulated_mean_tour
     return iteration_validation_data
+
+def evaluate_iteration_best(network, instance_data, distances, n_ants, demands, cap, k_sparse=None):
+    heuristics = None
+    if network is not None:
+        network.eval()
+        heuristic_vector = network(instance_data)
+        heuristics = reshape_heuristic(heuristic_vector, instance_data)
+    
+    acoInstance = ACO(n_ants, distances, demands, heuristics=heuristics, capacity=cap)
+    acoInstance.run(100, verbose=False)
+    return acoInstance.best_cost
+
 
 def get_instance_data(nodes, k_sparse=None):
     size = nodes.size()[0]
@@ -58,8 +71,31 @@ def validate(network, problem_size, n_ants, k_sparse=None):
     validation_data = torch.mean(validation_data, dim=0)
     return validation_data
 
+def validate_best_variable(network, min_problem_size, max_problem_size, n_ants, k_sparse=None, avg=True):
+    # dataset = load_variable_dataset('test', min_problem_size, max_problem_size)
+    dataset = test_dataset
+    capacities = test_capacities
+    validation_data = []
+    for i, (coords, demands) in enumerate(dataset):
+        # print(i)
+        # print(i, capacities[i])
+        pyg_data, distances = get_instance_data(coords, demands, k_sparse)
+        iteration_data = evaluate_iteration_best(network, pyg_data, distances, n_ants, demands, capacities[i])
+        # iteration_data = evaluate_iteration_best(network, pyg_data, distances, n_ants, demands, 50)
+        validation_data.append(iteration_data)
+    if avg:
+        return sum(validation_data)/len(validation_data)
+    else:
+        return validation_data
 
 
+def get_instance_data(nodes, demands, k_sparse=None):
+    size = nodes.size()[0]
+    distances = torch.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))
+    distances[torch.arange(size), torch.arange(size)] = 1e9
+    distances[0, 0] = 1e-10
+    pyg_data = convert_to_pyg_format(nodes, distances, demands, k_sparse=k_sparse)
+    return pyg_data, distances
 
 
 def generate_path_costs(paths, distances):
@@ -116,21 +152,15 @@ def reshape_heuristic(heursitic_vector, pyg_data):
     return heuristic_matrix
     
 
-def train_iteration(network, optimiser, instance_data, distances, demands, n_ants, k_sparse=None):
+def train_iteration(network, optimiser, instance_data, distances, demands, n_ants, k_sparse=None, cap=30):
     network.train()
     heuristic_vector = network(instance_data)
     heuristics = reshape_heuristic(heuristic_vector, instance_data)
     
-    acoInstance = ACO(n_ants, distances, demands, heuristics=heuristics)
+    acoInstance = ACO(n_ants, distances, demands, heuristics=heuristics, capacity=cap)
     # acoInstance.run(10, verbose=False)
     _, tour_costs, tour_log_probs = acoInstance.generate_paths_and_costs(gen_probs=True) # Ignore actual paths
 
-    # Inside comments is code for supervised
-    # path = solve_tsp(distances)
-    # optimal = generate_path_costs(path, distances)
-    # loss = generateSupervisedLoss(tour_costs, tour_log_probs, optimal)
-
-    # End
     loss = generateLoss(tour_costs, tour_log_probs)
     optimiser.zero_grad()
     loss.backward()
@@ -156,88 +186,99 @@ def train(network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=
     # validation_data = torch.stack(validation_data)
     # plot_validation_data(validation_data)
 
-heuristic_network = neuralnetwork.GNN(32, 12)
-# heuristic_network = neuralnetwork.GNN(40, 20)
-problem_size = 50
-k_sparse = None
-epochs = 10
-iterations_per_epoch = 100
-# iterations_per_epoch = 200
-n_ants = 15
-train(heuristic_network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=k_sparse)
+def train_variable(network, min_problem_size, max_problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=None, lr=1e-4, min_cap=None, max_cap=None):
+    optimiser = torch.optim.AdamW(network.parameters(), lr=lr)
+    for epoch in range(epochs):
+        for _ in range(iterations_per_epoch):
+            problem_size = random.randint(min_problem_size, max_problem_size)
+            coords, demands = generate_problem_instance(problem_size)
+            pyg_data, distances = get_instance_data(coords, demands)
+            # # Generate distance matrix
+            # distances = torch.sqrt(((coords[:, None] - coords[None, :]) ** 2).sum(2))
+            # distances[torch.arange(problem_size+1), torch.arange(problem_size+1)] = 1e9
+            # distances[0, 0] = 1e-10
+            # pyg_data = convert_to_pyg_format(coords, distances, demands)
 
-heuristic_network.eval()
-costs_base = []
-costs_heu = []
+            cap = 30
+            if min_cap is not None and max_cap is not None:
+                cap = problem_size = random.randint(min_cap, max_cap)
 
-costs = []
-
-
-for _ in range(20):
-    coords, demands = generate_problem_instance(problem_size)
-    # Generate distance matrix
-    distances = torch.sqrt(((coords[:, None] - coords[None, :]) ** 2).sum(2))
-    distances[torch.arange(problem_size+1), torch.arange(problem_size+1)] = 1e9
-    distances[0, 0] = 1e-10
-    pyg_data = convert_to_pyg_format(coords, distances, demands)
+            train_iteration(network, optimiser, pyg_data, distances, demands, n_ants, k_sparse=k_sparse, cap=cap)
 
 
-    sim = ACO(n_ants, distances, demands)
-    sim.run(50)
-    costs_base.append(sim.costs)
+# heuristic_network = neuralnetwork.GNN(32, 12)
+# # heuristic_network = neuralnetwork.GNN(40, 20)
+# problem_size = 25
+# k_sparse = None
+# epochs = 10
+# iterations_per_epoch = 100
+# # iterations_per_epoch = 200
+# n_ants = 15
+# train(heuristic_network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=k_sparse)
 
-    # visualiseWeights(data.x, sim.heuristics)
-    # visualiseWeights(data.x, sim.pheromones * sim.heuristics)
-    # visualiseWeights(coords, sim.pheromones * sim.heuristics, sim.generate_best_path())
-
-    heuristic_vector = heuristic_network(pyg_data)
-    heuristics = reshape_heuristic(heuristic_vector, pyg_data)
-    sim_heu = ACO(n_ants, distances, demands, heuristics=heuristics)
-    sim_heu.run(50)
-    costs_heu.append(sim_heu.costs)
-
-    # visualiseWeights(coords, sim_heu.pheromones * sim_heu.heuristics, sim_heu.generate_best_path())
-
-
-
-costs_base = np.column_stack(tuple(costs_base))
-costs_heu = np.column_stack(tuple(costs_heu))
-
-fig, ax = plt.subplots()
-ax.plot(np.mean(costs_base, axis=1), label='Base')
-ax.plot(np.mean(costs_heu, axis=1), label='Heu')
-
-plt.xlabel('No. Iterations')
-plt.ylabel('Path Length')
-plt.legend()
-plt.title(f'CVRP {problem_size}')
-plt.show()
-
-#  # Extrapolate
+# heuristic_network.eval()
 # costs_base = []
 # costs_heu = []
 
-# for _ in range(10):
-#     data, distances = generate_problem_instance(problem_size * 2)
-#     sim = ACO(15, distances)
-#     sim.run(50)
-#     costs_base.append(sim.costs)
+costs = []
+SIGNIFICANCE_RUNS = 15
+min_problem_size = 20
+max_problem_size = 50
+epochs = 10
+iterations_per_epoch = 1500
+n_ants = 15
 
-#     heuristic_vector = heuristic_network(data)
-#     heuristics = reshape_heuristic(heuristic_vector, data)
-#     sim_heu = ACO(15, distances, heuristics=heuristics)
-#     sim_heu.run(50)
-#     costs_heu.append(sim_heu.costs)
+min_cap = 10
+max_cap = 50
 
-# costs_base = np.column_stack(tuple(costs_base))
-# costs_heu = np.column_stack(tuple(costs_heu))
+if False:
+    test_dataset = generate_variable_dataset('test', min_problem_size, max_problem_size, 45)
+    order = torch.randperm(len(test_dataset))
+    test_dataset = [test_dataset[i] for i in order]
+    test_capacities = [[x for _ in range(35)] for x in range(min_cap, max_cap + 5, 5)]
+    test_capacities = torch.tensor(test_capacities).flatten().tolist()
+    print('starting')
 
-# fig, ax = plt.subplots()
-# ax.plot(np.mean(costs_base, axis=1), label='Base')
-# ax.plot(np.mean(costs_heu, axis=1), label='Heu')
+    heuristic_network = neuralnetwork.GNN(32, 12)
+    train_variable(heuristic_network, min_problem_size, max_problem_size, 1, iterations_per_epoch, n_ants)
+    print('trained 30')
+    heuristic_network.eval()
+    data_30 = validate_best_variable(heuristic_network, min_problem_size, max_problem_size, n_ants, avg=False)
+    print('evaluated 30')
+    torch.save(torch.tensor(data_30), f'results/cvrp/caps-30.pt')
 
-# plt.xlabel('No. Iterations')
-# plt.ylabel('Path Length')
-# plt.legend()
-# plt.title(f'TSP Extrapolated')
-# plt.show()
+    heuristic_network = neuralnetwork.GNN(32, 12)
+    train_variable(heuristic_network, min_problem_size, max_problem_size, 1, iterations_per_epoch, n_ants, min_cap=10, max_cap=50)
+    print('trained 10-50')
+    heuristic_network.eval()
+    data_10_50 = validate_best_variable(heuristic_network, min_problem_size, max_problem_size, n_ants, avg=False)
+    print('evaluated 10-50')
+    torch.save(torch.tensor(data_10_50), f'results/cvrp/caps-10-50.pt')
+
+
+    data_base = validate_best_variable(None, min_problem_size, max_problem_size, n_ants, avg=False)
+    print('evaluated base')
+    torch.save(torch.tensor(data_base), f'results/cvrp/caps-base.pt')
+
+
+data_30 = torch.load('results/cvrp/caps-30.pt')
+data_10_100 = torch.load('results/cvrp/caps-10-50.pt')
+data_base = torch.load('results/cvrp/caps-base.pt')
+
+fig, ax = plt.subplots()
+x = [i for i in range(min_cap, max_cap+5, 5)]
+
+for data, name in [(data_30, 'Model trained with capacity 30'), (data_10_100, 'Model trained with capacity 10-50'), (data_base, 'Expert heuristic')]:
+    data = data.reshape((-1, 35))
+    mean = data.mean(dim=1)
+    std = data.std(dim=1)
+    delta = 2.021 * std / (35 ** 0.5)
+    ax.plot(x, mean, label=f'{name}')
+    ax.fill_between(x, (mean-delta), (mean+delta), alpha=.2)
+
+
+plt.xlabel('Vehicle Capacity')
+plt.ylabel('Objective value')
+plt.legend()
+plt.title(f'Objective value against vehicle capacities')
+plt.show()

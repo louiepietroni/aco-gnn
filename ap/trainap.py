@@ -5,7 +5,8 @@ from torch_geometric.data import Data
 import matplotlib.pyplot as plt
 import neuralnetwork
 from tqdm import trange
-from utils import generate_dataset, visualiseWeights, load_dataset, generate_problem_instance, get_distances, convert_to_pyg_format
+import random
+from utils import generate_dataset, visualiseWeights, load_dataset, generate_problem_instance, get_distances, convert_to_pyg_format, generate_variable_dataset, solve_dataset
 
 
 def evaluate_iteration(network, instance_data, distances, n_ants, k_sparse=None):
@@ -28,6 +29,18 @@ def evaluate_iteration(network, instance_data, distances, n_ants, k_sparse=None)
     iteration_validation_data = torch.tensor([initial_best_tour, initial_mean_tour, simulated_best_tour, simulated_mean_tour])
 
     return iteration_validation_data
+
+
+def evaluate_iteration_best(network, instance_data, distances, n_ants, k_sparse=None):
+    heuristics = None
+    if network is not None:
+        network.eval()
+        heuristic_vector = network(instance_data)
+        heuristics = reshape_heuristic(heuristic_vector, instance_data)
+    
+    acoInstance = ACO(n_ants, distances, heuristics=heuristics)
+    acoInstance.run(100, verbose=False)
+    return acoInstance.best_cost
 
 def get_instance_data(nodes, k_sparse=None):
     size = nodes.size()[0]
@@ -52,6 +65,23 @@ def validate(network, problem_size, n_ants, k_sparse=None):
     validation_data = torch.stack(validation_data)
     validation_data = torch.mean(validation_data, dim=0)
     return validation_data
+
+def validate_best_variable(network, min_problem_size, max_problem_size, n_ants, k_sparse=None, avg=True):
+    # dataset = load_variable_dataset('test', min_problem_size, max_problem_size)
+    dataset = test_dataset
+    dataset_sols = sols
+    validation_data = []
+    for i, instance_costs in enumerate(dataset):
+        distances = get_distances(instance_costs)
+        pyg_data = convert_to_pyg_format(distances)
+
+        iteration_data = evaluate_iteration_best(network, pyg_data, distances, n_ants)
+        # iteration_data = evaluate_iteration_best(network, pyg_data, distances, n_ants, demands, 50)
+        validation_data.append(iteration_data / dataset_sols[i])
+    if avg:
+        return sum(validation_data)/len(validation_data)
+    else:
+        return validation_data
 
 
 
@@ -128,16 +158,97 @@ def train(network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=
     validation_data = []
     # validation_data.append(validate(network, problem_size, n_ants, k_sparse))
     for epoch in range(epochs):
-        for _ in (pbar := trange(iterations_per_epoch)):
+        for _ in range(iterations_per_epoch):
             task_costs = generate_problem_instance(problem_size)
             distances = get_distances(task_costs)
             pyg_data = convert_to_pyg_format(distances)
 
             train_iteration(network, optimiser, pyg_data, distances, n_ants, k_sparse=k_sparse)
-            pbar.set_description(f'Epoch {epoch+1}')
     #     validation_data.append(validate(network, problem_size, n_ants, k_sparse))
     # validation_data = torch.stack(validation_data)
     # plot_validation_data(validation_data)
+            
+def train_variable(network, min_problem_size, max_problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=None, lr=1e-4):
+    optimiser = torch.optim.AdamW(network.parameters(), lr=lr)
+    for epoch in range(epochs):
+        for _ in range(iterations_per_epoch):
+            problem_size = random.randint(min_problem_size, max_problem_size)
+            task_costs = generate_problem_instance(problem_size)
+            distances = get_distances(task_costs)
+            pyg_data = convert_to_pyg_format(distances)
+
+            train_iteration(network, optimiser, pyg_data, distances, n_ants, k_sparse=k_sparse)
+
+
+costs = []
+min_problem_size = 10
+max_problem_size = 100
+epochs = 10
+iterations_per_epoch = 1000
+n_ants = 15
+
+min_cap = 10
+max_cap = 50
+if False:
+    test_dataset = generate_variable_dataset('test', min_problem_size, max_problem_size, 50)
+    sols = solve_dataset(test_dataset)
+
+    for size in [20, 50, 100]:
+        heuristic_network = neuralnetwork.GNN(32, 12)
+        train(heuristic_network, size, epochs, iterations_per_epoch, n_ants)
+        heuristic_network.eval()
+        print(f'trained {size}')
+        data = validate_best_variable(heuristic_network, min_problem_size, max_problem_size, n_ants, avg=False)
+        torch.save(torch.tensor(data), f'results/ap/sizes-{size}.pt')
+        print(f'Completed {size}')
+
+    heuristic_network = neuralnetwork.GNN(32, 12)
+    train_variable(heuristic_network, 20, 50, epochs, iterations_per_epoch, n_ants)
+    heuristic_network.eval()
+    print(f'trained 20-50')
+    data_20_50 = validate_best_variable(heuristic_network, min_problem_size, max_problem_size, n_ants, avg=False)
+    torch.save(torch.tensor(data_20_50), 'results/ap/sizes-20-50.pt')
+    print(f'Completed 20-50')
+
+    data_base = validate_best_variable(None, min_problem_size, max_problem_size, n_ants, avg=False)
+    torch.save(torch.tensor(data_base), 'results/ap/sizes-base.pt')
+    print(f'Completed base')
+
+
+data_20 = torch.load('results/ap/sizes-20.pt')
+data_50 = torch.load('results/ap/sizes-50.pt')
+data_100 = torch.load('results/ap/sizes-100.pt')
+data_20_50 = torch.load('results/ap/sizes-20-50.pt')
+data_base = torch.load('results/ap/sizes-base.pt')
+
+fig, ax = plt.subplots()
+x = [i for i in range(min_problem_size, max_problem_size+5, 5)]
+
+for data, name in [(data_20, 'AP20'), (data_50, 'AP50'), (data_100, 'AP100'), (data_20_50, 'AP20-50'), (data_base, 'Expert heuristic')]:
+    data = (data - 1) * 100
+    data = data.reshape((-1, 50))
+    mean = data.mean(dim=1)
+    std = data.std(dim=1)
+    delta = 2.021 * std / (50 ** 0.5)
+    ax.plot(x, mean, label=f'{name}')
+    ax.fill_between(x, (mean-delta), (mean+delta), alpha=.2)
+
+plt.xlabel('Problem size')
+plt.ylabel('Optimality gap %')
+plt.legend()
+plt.title(f'Optimality gap against problem sizes')
+plt.show()
+
+print('this')
+
+
+
+
+
+
+
+
+
 heuristic_network = neuralnetwork.GNN(32, 12)
 # heuristic_network = neuralnetwork.GNN(40, 20)
 problem_size = 100

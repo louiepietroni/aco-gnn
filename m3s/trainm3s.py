@@ -130,11 +130,107 @@ def train(network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=
             pbar.set_description(f'Epoch {epoch+1}')
         validation_data.append(validate(network, problem_size, n_ants, k_sparse))
     validation_data = torch.stack(validation_data)
-    plot_validation_data(validation_data)
+    # plot_validation_data(validation_data)
+
+
+costs_base = []
+costs_model = []
+SIGNIFICANCE_RUNS=5
+
+heuristic_network = neuralnetwork.GNN(32, 12)
+problem_size = 50
+k_sparse = None
+epochs = 1
+iterations_per_epoch = 700
+n_ants = 15
+# test_dataset = generate_dataset('test', problem_size, 30)
+test_dataset = load_dataset('test', 50)
+
+# print(torch.load('results/m3s/run-base.pt').size())
+
+
+
+for _ in range(SIGNIFICANCE_RUNS):
+    continue
+    heuristic_network = neuralnetwork.GNN(32, 12)
+    train(heuristic_network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=k_sparse)
+
+    run_costs_base = []
+    run_costs_model = []
+    print('trained')
+    fail = False
+    for clauses in test_dataset:
+        distances = get_distances(clauses, problem_size)
+        pyg_data = convert_to_pyg_format(clauses, distances)
+
+        # sim = ACO(n_ants, distances, clauses)
+        # sim.run(750)
+        
+        print('eval base')
+
+        heuristic_vector = heuristic_network(pyg_data)
+        heuristics = reshape_heuristic(heuristic_vector, pyg_data)
+        try:
+            sim_heu = ACO(n_ants, distances, clauses, heuristics=heuristics)
+            sim_heu.run(750)
+
+            # run_costs_base.append(sim.costs)
+            run_costs_model.append(sim_heu.costs)
+        except:
+            print('FAIL')
+        
+
+    # costs_base.append(torch.tensor(run_costs_base).mean(dim=0).tolist())
+    costs_model.append(torch.tensor(run_costs_model).mean(dim=0).tolist())
+
+# torch.save(torch.tensor(costs_model), 'results/m3s/new-run-model-old.pt')
+# torch.save(torch.tensor(costs_base), 'results/m3s/new-run-base.pt')
+
+data_model = torch.load('results/m3s/new-run-model.pt')
+data_model_old = torch.load('results/m3s/new-run-model-old.pt')
+data_base = torch.load('results/m3s/new-run-base.pt')
+
+print(data_model.size())
+
+
+fig, ax = plt.subplots()
+x = [i for i in range(1, 751)]
+
+mean = data_model.mean(dim=0)
+std = data_model.std(dim=0)
+delta = 2.131 * std / (SIGNIFICANCE_RUNS ** 0.5)
+ax.plot(x, mean, label=f'Updated architecture')
+ax.fill_between(x, (mean-delta), (mean+delta), alpha=.2)
+print(f'Updated architecture {mean}')
+
+mean = data_model_old.mean(dim=0)
+std = data_model_old.std(dim=0)
+delta = 2.131 * std / (SIGNIFICANCE_RUNS ** 0.5)
+ax.plot(x, mean, label=f'Original architecture')
+ax.fill_between(x, (mean-delta), (mean+delta), alpha=.2)
+print(f'Original architecture {mean}')
+
+mean = data_base.mean(dim=0)
+std = data_base.std(dim=0)
+delta = 2.131 * std / (SIGNIFICANCE_RUNS ** 0.5)
+ax.plot(x, mean, label=f'Pure ACO')
+ax.fill_between(x, (mean-delta), (mean+delta), alpha=.2)
+print(f'Base {mean}')
+
+plt.xlabel('Rounds of solution search')
+plt.ylabel('Objective value')
+plt.title(f'Objective value during rounds of ACO solution construction')
+plt.legend()
+plt.show()
+
+
+
+
+
 
 heuristic_network = neuralnetwork.GNN(32, 12)
 # heuristic_network = neuralnetwork.GNN(40, 20)
-problem_size = 20
+problem_size = 50
 k_sparse = None
 epochs = 20
 iterations_per_epoch = 100
@@ -148,14 +244,16 @@ costs_heu = []
 
 costs = []
 
+test_dataset = generate_dataset('test', problem_size, 10)
 
-for _ in range(10):
+
+for _ in range(5):
     clauses = generate_problem_instance(problem_size)
     distances = get_distances(clauses, problem_size)
     pyg_data = convert_to_pyg_format(clauses, distances)
 
     sim = ACO(n_ants, distances, clauses)
-    sim.run(5000)
+    sim.run(1500)
     costs_base.append(sim.costs)
 
     # visualiseWeights(data.x, sim.heuristics)
@@ -165,7 +263,7 @@ for _ in range(10):
     heuristic_vector = heuristic_network(pyg_data)
     heuristics = reshape_heuristic(heuristic_vector, pyg_data)
     sim_heu = ACO(n_ants, distances, clauses, heuristics=heuristics)
-    sim_heu.run(5000)
+    sim_heu.run(1500)
     costs_heu.append(sim_heu.costs)
 
     # visualiseWeights(coords, sim_heu.pheromones * sim_heu.heuristics, sim_heu.generate_best_path())

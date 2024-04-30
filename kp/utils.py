@@ -111,7 +111,7 @@ def generate_dataset(dataset_type, problem_size, dataset_size):
     dataset = torch.stack(instances)
     Path(f'datasets/kp/{problem_size}').mkdir(parents=True, exist_ok=True)
     torch.save(dataset, f'datasets/kp/{problem_size}/{dataset_type}.pt')
-    print(f'Generated {dataset_size} instances in: datasets/ap/{problem_size}/{dataset_type}.pt')
+    print(f'Generated {dataset_size} instances in: datasets/kp/{problem_size}/{dataset_type}.pt')
 
 
 def load_dataset(dataset_type, problem_size):
@@ -121,4 +121,4 @@ def load_dataset(dataset_type, problem_size):
 
     return dataset
 
-# generate_dataset('val', 100, 20)
+# generate_dataset('test', 30, 25)

@@ -135,6 +135,63 @@ def train(network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=
         validation_data.append(validate(network, problem_size, n_ants, k_sparse))
     validation_data = torch.stack(validation_data)
     plot_validation_data(validation_data)
+
+
+
+
+heuristic_network = neuralnetwork.GNN(32, 12)
+# heuristic_network = neuralnetwork.GNN(40, 20)
+problem_size = 100
+k_sparse = None
+epochs = 20
+iterations_per_epoch = 100
+# iterations_per_epoch = 200
+n_ants = 20
+
+train(heuristic_network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=k_sparse)
+print(validate(heuristic_network, problem_size, n_ants, k_sparse))
+# tensor([40.7195, 41.1087, 41.1124, 41.3281])
+
+
+heuristic_network.eval()
+costs_model = []
+costs_base = []
+test_dataset = load_dataset('test', problem_size)
+SIGNIFICANCE_RUNS = 15
+# for _ in range(10):
+#     data = generate_problem_instance(problem_size)
+for _ in range(SIGNIFICANCE_RUNS):
+    run_costs_model = []
+    run_costs_base = []
+    for data in test_dataset:
+        weights, values = get_distances(data)
+        pyg_data = convert_to_pyg_format(data, weights, values)
+
+        sim = ACO(n_ants, weights, values)
+        sim.run(50)
+        run_costs_base.append(sim.costs)
+
+        heuristic_vector = heuristic_network(pyg_data)
+        heuristics = reshape_heuristic(heuristic_vector, pyg_data)
+        sim_heu = ACO(n_ants, weights, values, heuristics=heuristics)
+        sim_heu.run(50)
+        run_costs_model.append(sim_heu.costs)
+    
+    costs_model.append(torch.tensor(run_costs_model).mean(dim=0).tolist())
+    costs_base.append(torch.tensor(run_costs_base).mean(dim=0).tolist())
+
+torch.save(torch.tensor(costs_model), 'results/kp/run-model.pt')
+torch.save(torch.tensor(costs_base), 'results/kp/run-base.pt')
+
+
+
+
+print('DONE')
+
+
+
+
+
 heuristic_network = neuralnetwork.GNN(32, 12)
 # heuristic_network = neuralnetwork.GNN(40, 20)
 problem_size = 100

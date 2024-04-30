@@ -15,12 +15,13 @@ class ACO:
         self.distances = distances
         # Our basic heuristic for a node is the #edges that node has
         # Heuristics don't matter which edge you come from, so u->x = v->x
-        self.heuristics = heuristics if heuristics is not None else torch.sum(distances, dim=1).repeat(self.n_nodes, 1)+0.5
+        self.heuristics = heuristics + 1e-9 if heuristics is not None else torch.sum(distances, dim=1).repeat(self.n_nodes, 1)+0.5
         if heuristics is None:
             self.heuristics[:, 0] = 1e-9
         self.pheromones = torch.ones_like(distances)
         self.costs = []
         self.constraints = 1 - distances # 1 for all valid nodes to visit from i
+        self.best_cost = torch.inf
     
     @torch.no_grad()
     def run(self, n_iterations, verbose=True):
@@ -37,6 +38,9 @@ class ACO:
         paths, path_costs, _ = self.generate_paths_and_costs() # We disregard the probs here, not needed
         self.update_pheromones(paths, path_costs)
         self.costs.append(torch.mean(path_costs).item())
+
+        best_iteration_cost = torch.min(path_costs).item()
+        self.best_cost = min(best_iteration_cost, self.best_cost)
     
     @torch.no_grad()
     def update_pheromones(self, paths, path_costs):
@@ -82,20 +86,23 @@ class ACO:
     
 
     def update_mask(self, mask, current_positions):
-        mask[torch.arange(self.n_ants), current_positions] = 0 # Places just visited now not valid
-        mask[:, 0] = 1 # Can always visit the depot
-        mask[(current_positions==0) * (mask[:, 1:]!=0).any(dim=1), 0] = 0 # Except if we're at depot and a node we need to visit
+        # Locations just visited no longer valid
+        mask[torch.arange(self.n_ants), current_positions] = 0
+        # Completed if can't go to any other node and are at dummy node
+        completed_agents = (mask[:, 1:]==0).all(dim=1) * (current_positions==0)
+        valid_to_dummy = torch.logical_or(completed_agents, (current_positions != 0))
+        # Completed agents and those not at dummy node now can always visit the dummy node
+        mask[valid_to_dummy, 0] = 1
+
         return mask
     
     def update_valid_colour_mask(self, colour_mask, current_positions):
-        # If we're at the depot, reset to allow all nodes
+        # If we're at the dummy node, reset to allow all nodes
         colour_mask[current_positions == 0, :] = 1
         # Any nodes which have edges to where we are now can't be visited
-        # print(colour_mask)
         for i in range(self.n_ants):
             colour_mask[i] = colour_mask[i] * self.constraints[current_positions[i]]
         
-        # print(colour_mask)
         return colour_mask
 
         

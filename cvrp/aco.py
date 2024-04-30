@@ -6,7 +6,7 @@ import numpy as np
 from cvrputils import visualiseWeights
 
 class ACO:
-    def __init__(self, n_ants, distances, demands, alpha=1, beta=1, evaportation_rate = 0.1, heuristics=None) -> None:
+    def __init__(self, n_ants, distances, demands, alpha=1, beta=1, evaportation_rate = 0.1, heuristics=None, capacity=25) -> None:
         self.n_ants = n_ants
         self.n_nodes = len(distances)
         self.alpha = alpha
@@ -17,7 +17,8 @@ class ACO:
         self.heuristics = heuristics if heuristics is not None else 1/distances
         self.pheromones = torch.ones_like(distances)
         self.costs = []
-        self.capacity = 50
+        self.capacity = capacity
+        self.best_cost = torch.inf
     
     @torch.no_grad()
     def run(self, n_iterations, verbose=True):
@@ -34,6 +35,9 @@ class ACO:
         paths, path_costs, _ = self.generate_paths_and_costs() # We disregard the probs here, not needed
         self.update_pheromones(paths, path_costs)
         self.costs.append(torch.mean(path_costs).item())
+
+        best_iteration_cost = torch.min(path_costs).item()
+        self.best_cost = min(best_iteration_cost, self.best_cost)
     
     @torch.no_grad()
     def update_pheromones(self, paths, path_costs):
@@ -75,11 +79,13 @@ class ACO:
         return torch.sum(self.distances[hop_starts[:, :-1], hop_ends[:, :-1]], dim=1)
 
     def update_mask(self, mask, current_positions):
-        mask[torch.arange(self.n_ants), current_positions] = 0 # Places just visited now not valid
-        mask[:, 0] = 1 # Can always visit the depot
-        inidices_at_depot = current_positions == 0
-        # mask[inidices_at_depot, 0] = 0 # Except if we're at the depot now
-        mask[(current_positions==0) * (mask[:, 1:]!=0).any(dim=1), 0] = 0 # logic
+        # Locations just visited no longer valid
+        mask[torch.arange(self.n_ants), current_positions] = 0
+        # Completed if can't go to any other node and are at dummy node
+        completed_agents = (mask[:, 1:]==0).all(dim=1) * (current_positions==0)
+        valid_to_dummy = torch.logical_or(completed_agents, (current_positions != 0))
+        # Completed agents and those not at dummy node now can always visit the dummy node
+        mask[valid_to_dummy, 0] = 1
         return mask
     
     def done(self, valid_mask, current_positions):
@@ -192,7 +198,7 @@ def convert_to_pyg_format(nodes, distances,k_sparse=None):
 
 
 def example_run():
-    size = 4
+    size = 10
     nodes, demands = generate_problem_instance(size)
     distances = torch.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))
     distances[torch.arange(size+1), torch.arange(size+1)] = 1e9
@@ -203,8 +209,8 @@ def example_run():
 
     costs = []
     for _ in range(1):
-        sim = ACO(3, distances, demands)
-        sim.run(1)
+        sim = ACO(15, distances, demands)
+        sim.run(500)
         costs.append(sim.costs)
     costs = np.column_stack(tuple(costs))
     fig, ax = plt.subplots()
@@ -215,6 +221,6 @@ def example_run():
     plt.title(f'TSP{size}')
     plt.show()
 
-    # visualiseWeights(nodes, sim.heuristics * sim.pheromones, path=sim.generate_best_path())
+    visualiseWeights(nodes, sim.heuristics * sim.pheromones, path=sim.generate_best_path(), l=demands)
 
 # example_run()

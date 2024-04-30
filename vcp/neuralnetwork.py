@@ -30,6 +30,7 @@ class GNNLayer(nn.Module):
         Ch = self.C(h_initial)
 
         sigmoid_e = torch.sigmoid(e_initial)
+        # sigmoid_e = e_initial
 
         aggregated_h = self.aggregation_function(sigmoid_e * Vh[edge_index[1]], edge_index[0])
         h = h_initial + self.activation_function(self.h_batchNorm(Uh + aggregated_h))

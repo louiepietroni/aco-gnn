@@ -107,6 +107,8 @@ def convert_to_pyg_format(edges, distances):
     # edge_data = distances.to_sparse()
     adjacency_matix = torch.ones_like(distances)
     adjacency_matix[distances!=1] = -1 # Locations with no edge edge = 1, no edge = -1
+    # adjacency_matix[distances!=1] = 1e9 # Locations with no edge edge = 1, no edge = -1
+    # adjacency_matix[distances==1] = 1e9 # Locations with no edge edge = 1, no edge = -1
     # NOTE: Above with -1, 1e-9, 1e9 try out!
     # adjacency_matix[distances==1] = -1 # Locations with edge
     # print(adjacency_matix)
@@ -120,6 +122,7 @@ def convert_to_pyg_format(edges, distances):
 
 def generate_dataset(dataset_type, problem_size, dataset_size):
     instances = [generate_problem_instance(problem_size) for _ in range(dataset_size)]
+    return instances
     dataset = torch.stack(instances)
     Path(f'datasets/m3s/{problem_size}').mkdir(parents=True, exist_ok=True)
     torch.save(dataset, f'datasets/m3s/{problem_size}/{dataset_type}.pt')
@@ -132,4 +135,4 @@ def load_dataset(dataset_type, problem_size):
 
     return dataset
 
-# generate_dataset('val', 50, 10)
+# generate_dataset('test', 50, 30)

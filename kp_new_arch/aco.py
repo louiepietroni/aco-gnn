@@ -83,9 +83,6 @@ class ACO:
     def update_mask(self, mask, current_positions):
         mask[torch.arange(self.n_ants), current_positions] = 0 # Places just visited now not valid
         mask[:, 0] = 1 # Can always visit the dummy node
-        inidices_at_depot = current_positions == 0
-        # mask[inidices_at_depot, 0] = 0 # Except if we're at the dummy node now
-        # mask[(current_positions==0) * (mask[:, 1:]!=0).any(dim=1), 0] = 0 # logic
         return mask
     
     def done(self, valid_mask, current_positions):
