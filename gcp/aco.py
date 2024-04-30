@@ -52,7 +52,6 @@ class ACO:
 
             # Deposit pheromones proportional to the cost of the path
             self.pheromones[ant_path_starts[:-1], ant_path_ends[:-1]] += 1./ant_path_cost
-            # self.pheromones[ant_path_ends, ant_path_starts] += 1./ant_path_cost
     
 
     def generate_paths_and_costs(self, gen_probs=False):
@@ -77,10 +76,6 @@ class ACO:
             ant_tour_length = len(torch.unique_consecutive(paths[i]))
             ant_bins_used = ant_tour_length - self.n_nodes
             colours_used[i] = ant_bins_used
-        # print('PATHS')
-        # print(paths)
-        # print('COLOURS USED')
-        # print(colours_used)
 
         return colours_used
     
@@ -105,40 +100,18 @@ class ACO:
         
         return colour_mask
 
-        
     
     def done(self, valid_mask, current_positions):
         # Want to verify we've visited everywhere and we're currently at the depot
         visited_all_locations = (valid_mask[:, 1:] == 0).all()
         all_at_depot = (current_positions[:] == 0).all()
         return visited_all_locations and all_at_depot
-    
-    def update_capacity_mask(self, current_positions, used_capacity):
-        # Any nodes which have edges to where we are now can't be visited
-        # If we're at the depot, reset to allow all nodes
-        capacity_mask = torch.ones(size=(self.n_ants, self.n_nodes))
-        # update capacity
-        used_capacity[current_positions==0] = 0
-        used_capacity = used_capacity + self.sizes[current_positions]
-        # update capacity_mask
-        remaining_capacity = self.capacity - used_capacity # (n_ants,)
-        remaining_capacity_repeat = remaining_capacity.repeat(1, self.n_nodes) # (n_ants, p_size)
-        demand_repeat = self.sizes.t().repeat(self.n_ants, 1) # (n_ants, p_size)
-        # print(self.demands.size())
-        # print(remaining_capacity.size())
-        # print(remaining_capacity_repeat.size())
-        # print(demand_repeat.size())
-        capacity_mask[demand_repeat > remaining_capacity_repeat] = 0
-        
-        return used_capacity, capacity_mask
-    
+
     
     def generate_paths(self, gen_probs=False):
         current_positions = torch.randint(low=0, high=1, size=(self.n_ants,))
-        # current_positions = torch.zeros((self.n_ants,))
         valid_mask = torch.ones(size=(self.n_ants, self.n_nodes))
         valid_colour_mask = torch.ones(size=(self.n_ants, self.n_nodes))
-        # used_capacity, capacity_mask = self.update_capacity_mask(current_positions, used_capacity)
 
 
         paths = current_positions.reshape(self.n_ants, 1) # #ants x 1
@@ -168,22 +141,9 @@ class ACO:
         move_heuristics = self.heuristics[current_positions] 
         move_pheromones = self.pheromones[current_positions]
 
-        # move_heuristics = self.sizes.t().repeat(self.n_ants, 1)
-        # move_heuristics[:, 0] = 1e-9
-
         # Build the probabilities for each of these positions 
         move_probabilities = move_heuristics ** self.alpha * move_pheromones ** self.beta * valid_mask * capacity_mask # #ants x #nodes
-        # print('NAN', move_heuristics.isnan().any())
-        # exit()
-        # print('STARTING MOVE')
-        # print(move_heuristics)
-        # print(move_pheromones)
-        # print(valid_mask)
-        # print(capacity_mask)
-        # print(move_probabilities)
-
         # Generate random indices (moves) based on the probabilities
-        # print(move_probabilities)
         moves = torch.multinomial(move_probabilities, 1).squeeze()
 
         log_probabilites = None
@@ -199,9 +159,7 @@ def example_run():
     size = 50
     edges = generate_problem_instance(size, p=0.8)
     distances = get_distances(edges, size)
-    # print('EDGES')
-    # print(edges)
-
+    
     costs = []
     for _ in range(5):
         sim = ACO(15, distances)

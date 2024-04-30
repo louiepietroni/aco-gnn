@@ -49,9 +49,6 @@ def visualiseWeights(nodes, weights, path=None):
     if path is not None:
         path = path.detach()
         splits = (path == 0).nonzero().flatten().tolist()
-        # print(path)
-        # print(splits)
-        # print(splits.nonzero().flatten().tolist())
         sub_paths = [path[splits[cur]:splits[cur+1]].tolist() for cur in range(len(splits)-1)]
         sub_paths = [path for path in sub_paths if len(path) > 1]
         # print(sub_paths)
@@ -67,11 +64,9 @@ def visualiseWeights(nodes, weights, path=None):
 
 def get_distances(edges, size):
     distances = torch.zeros(size=(size+1, size+1))
-    # distances[:, :] = 1e9 # Set most distances to max
     distances[edges[:, 0], edges[:, 1]] = 1 # Distances where we have an edge are 1
     distances[edges[:, 1], edges[:, 0]] = 1
-    # distances[0, :] = 1e-9 # Distances to/from dummy node is very small
-    # distances[:, 0] = 1e-9
+
     return distances
 
 def sparsify(items, p):
@@ -90,10 +85,6 @@ def convert_to_pyg_format(distances):
     # edge_data = distances.to_sparse()
     adjacency_matix = torch.ones_like(distances)
     adjacency_matix[distances!=1] = -1 # Locations with no edge edge = 1, no edge = -1
-    # adjacency_matix[distances!=1] = 1e-9 # Locations with no edge edge = 1, no edge = -1
-    # NOTE: Above with -1, 1e-9, 1e9 try out!
-    # adjacency_matix[distances==1] = -1 # Locations with edge
-    # print(adjacency_matix)
     edge_data = adjacency_matix.to_sparse()
     edge_index = edge_data.indices()
     edge_attr = edge_data.values().reshape(-1, 1)
@@ -118,10 +109,4 @@ def load_dataset(dataset_type, problem_size):
 
     return dataset
 
-
-
 # generate_dataset('val', 100, 25)
-# generate_dataset('val', 25, 5)
-# generate_dataset('test', 25, 10)
-# generate_dataset('test', 35, 5)
-# generate_dataset('val', 35, 10)

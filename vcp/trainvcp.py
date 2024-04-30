@@ -3,7 +3,6 @@ import numpy as np
 from aco import ACO
 from torch_geometric.data import Data
 import matplotlib.pyplot as plt
-import neuralnetwork
 from tqdm import trange
 from utils import generate_dataset, visualiseWeights, load_dataset, generate_problem_instance, convert_to_pyg_format, get_distances
 
@@ -27,7 +26,6 @@ def evaluate_iteration(network, instance_data, distances, edges, n_ants, k_spars
 
     iteration_validation_data = torch.tensor([initial_best_tour, initial_mean_tour, simulated_best_tour, simulated_mean_tour])
 
-    # return initial_best_tour, initial_mean_tour, simulated_best_tour, simulated_mean_tour
     return iteration_validation_data
 
 
@@ -46,9 +44,6 @@ def validate(network, problem_size, n_ants, k_sparse=None):
     return validation_data
 
 
-
-
-
 def generate_path_costs(paths, distances):
     length = 0
     paths.append(paths[0])
@@ -57,7 +52,6 @@ def generate_path_costs(paths, distances):
         v = paths[i+1]
         length += distances[u, v]
     return length
-
 
 
 def plot_validation_data(validation_data):
@@ -104,12 +98,6 @@ def train_iteration(network, optimiser, instance_data, distances, edges, n_ants,
     # acoInstance.run(10, verbose=False)
     _, tour_costs, tour_log_probs = acoInstance.generate_paths_and_costs(gen_probs=True) # Ignore actual paths
 
-    # Inside comments is code for supervised
-    # path = solve_tsp(distances)
-    # optimal = generate_path_costs(path, distances)
-    # loss = generateSupervisedLoss(tour_costs, tour_log_probs, optimal)
-
-    # End
     loss = generateLoss(tour_costs, tour_log_probs)
     optimiser.zero_grad()
     loss.backward()
@@ -131,155 +119,3 @@ def train(network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=
     #     validation_data.append(validate(network, problem_size, n_ants, k_sparse))
     # validation_data = torch.stack(validation_data)
     # plot_validation_data(validation_data)
-
-heuristic_network = neuralnetwork.GNN(32, 12)
-# heuristic_network = neuralnetwork.GNN(40, 20)
-problem_size = 30
-k_sparse = None
-epochs = 3
-iterations_per_epoch = 100
-# iterations_per_epoch = 200
-n_ants = 15
-# train(heuristic_network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=k_sparse)
-
-heuristic_network.eval()
-costs_base = []
-costs_heu = []
-
-costs = []
-
-
-
-heuristic_network.eval()
-costs_model = []
-costs_base = []
-test_dataset = load_dataset('test', problem_size)
-SIGNIFICANCE_RUNS = 15
-for _ in range(SIGNIFICANCE_RUNS):
-    continue
-    heuristic_network = neuralnetwork.GNN(32, 12)
-    train(heuristic_network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=k_sparse)
-    heuristic_network.eval()
-    run_costs_model = []
-    run_costs_base = []
-    for edges in test_dataset:
-        distances = get_distances(edges, problem_size)
-        pyg_data = convert_to_pyg_format(distances)
-
-        sim = ACO(n_ants, distances, edges)
-        sim.run(150)
-        run_costs_base.append(sim.costs)
-
-        heuristic_vector = heuristic_network(pyg_data)
-        heuristics = reshape_heuristic(heuristic_vector, pyg_data)
-        sim_heu = ACO(n_ants, distances, edges, heuristics=heuristics)
-        sim_heu.run(150)
-        run_costs_model.append(sim_heu.costs)
-    
-    costs_model.append(torch.tensor(run_costs_model).mean(dim=0).tolist())
-    costs_base.append(torch.tensor(run_costs_base).mean(dim=0).tolist())
-
-# torch.save(torch.tensor(costs_model), 'results/vcp/run-model.pt')
-# torch.save(torch.tensor(costs_base), 'results/vcp/run-base.pt')
-
-print("DONEDONE")
-
-data_model = torch.load('results/vcp/run-model.pt')[:, :75]
-data_base = torch.load('results/vcp/run-base.pt')[:, :75]
-
-# print(data_model.size())
-
-
-fig, ax = plt.subplots()
-x = [i for i in range(1, 76)]
-
-mean = data_base.mean(dim=0)
-std = data_base.std(dim=0)
-delta = 2.131 * std / (SIGNIFICANCE_RUNS ** 0.5)
-ax.plot(x, mean, label=f'Expert heuristic')
-ax.fill_between(x, (mean-delta), (mean+delta), alpha=.2)
-print(f'Updated architecture {mean}')
-
-mean = data_model.mean(dim=0)
-std = data_model.std(dim=0)
-delta = 2.131 * std / (SIGNIFICANCE_RUNS ** 0.5)
-ax.plot(x, mean, label=f'GNN + ACO')
-ax.fill_between(x, (mean-delta), (mean+delta), alpha=.2)
-print(f'Updated architecture {mean}')
-
-
-plt.xlabel('ACO iterations')
-plt.ylabel('Objective value')
-plt.legend()
-plt.title(f'Objective value against ACO rounds for VCP')
-plt.show()
-
-# torch.save(torch.tensor(costs_base), 'results/kp/temp-base.pt')
-# torch.save(torch.tensor(costs_heu), 'results/kp/temp-model-new.pt')
-
-
-for _ in range(10):
-    edges = generate_problem_instance(problem_size, p=0.25)
-    distances = get_distances(edges, problem_size)
-    pyg_data = convert_to_pyg_format(distances)
-
-
-    sim = ACO(n_ants, distances, edges)
-    sim.run(150)
-    costs_base.append(sim.costs)
-
-    # visualiseWeights(data.x, sim.heuristics)
-    # visualiseWeights(data.x, sim.pheromones * sim.heuristics)
-    # visualiseWeights(coords, sim.pheromones * sim.heuristics, sim.generate_best_path())
-
-    heuristic_vector = heuristic_network(pyg_data)
-    heuristics = reshape_heuristic(heuristic_vector, pyg_data)
-    sim_heu = ACO(n_ants, distances, edges, heuristics=heuristics)
-    sim_heu.run(150)
-    costs_heu.append(sim_heu.costs)
-
-    # visualiseWeights(coords, sim_heu.pheromones * sim_heu.heuristics, sim_heu.generate_best_path())
-
-
-
-costs_base = np.column_stack(tuple(costs_base))
-costs_heu = np.column_stack(tuple(costs_heu))
-
-fig, ax = plt.subplots()
-ax.plot(np.mean(costs_base, axis=1), label='Base')
-ax.plot(np.mean(costs_heu, axis=1), label='Heu')
-
-plt.xlabel('No. Iterations')
-plt.ylabel('Path Length')
-plt.legend()
-plt.title(f'VCP {problem_size}')
-plt.show()
-
-#  # Extrapolate
-# costs_base = []
-# costs_heu = []
-
-# for _ in range(10):
-#     data, distances = generate_problem_instance(problem_size * 2)
-#     sim = ACO(15, distances)
-#     sim.run(50)
-#     costs_base.append(sim.costs)
-
-#     heuristic_vector = heuristic_network(data)
-#     heuristics = reshape_heuristic(heuristic_vector, data)
-#     sim_heu = ACO(15, distances, heuristics=heuristics)
-#     sim_heu.run(50)
-#     costs_heu.append(sim_heu.costs)
-
-# costs_base = np.column_stack(tuple(costs_base))
-# costs_heu = np.column_stack(tuple(costs_heu))
-
-# fig, ax = plt.subplots()
-# ax.plot(np.mean(costs_base, axis=1), label='Base')
-# ax.plot(np.mean(costs_heu, axis=1), label='Heu')
-
-# plt.xlabel('No. Iterations')
-# plt.ylabel('Path Length')
-# plt.legend()
-# plt.title(f'TSP Extrapolated')
-# plt.show()

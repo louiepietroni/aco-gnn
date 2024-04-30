@@ -7,8 +7,6 @@ from pathlib import Path
 
 
 def get_cmap(n, name='hsv'):
-    '''Returns a function that maps each index in 0, 1, ..., n-1 to a distinct 
-    RGB color; the keyword argument name must be a standard mpl colormap name.'''
     return plt.cm.get_cmap(name, n)
 
 def visualiseWeights(nodes, weights, path=None):
@@ -86,17 +84,12 @@ def generate_problem_instance(size):
     variables = torch.arange(1, size+1)
     clauses = set()
     while len(clauses) < size * 4:
-    # for _ in range(clauses_to_generate):
-        # variables_in_clause = torch.sort(torch.randint(1, size+1, size=(3,))).values # 3 random varibles (sorted)
+
         variables_in_clause = torch.randperm(size)[:3] + 1
         clause = variables_in_clause + size*torch.randint(2, size=(3,)) # Equal chance of generating negated version
         clause = torch.sort(clause).values
         clauses.add(tuple(clause.tolist()))
     return torch.tensor(list(clauses))
-
-# instance = generate_problem_instance(20)
-# print(instance)
-# print(instance.size())
 
 
 def convert_to_pyg_format(edges, distances):
@@ -107,15 +100,10 @@ def convert_to_pyg_format(edges, distances):
     # edge_data = distances.to_sparse()
     adjacency_matix = torch.ones_like(distances)
     adjacency_matix[distances!=1] = -1 # Locations with no edge edge = 1, no edge = -1
-    # adjacency_matix[distances!=1] = 1e9 # Locations with no edge edge = 1, no edge = -1
-    # adjacency_matix[distances==1] = 1e9 # Locations with no edge edge = 1, no edge = -1
-    # NOTE: Above with -1, 1e-9, 1e9 try out!
-    # adjacency_matix[distances==1] = -1 # Locations with edge
-    # print(adjacency_matix)
+
     edge_data = adjacency_matix.to_sparse()
     edge_index = edge_data.indices()
     edge_attr = edge_data.values().reshape(-1, 1)
-    # print(edge_attr)
     data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
     return data
 

@@ -2,13 +2,10 @@ import matplotlib.pyplot as plt
 import torch
 import networkx as nx
 from torch_geometric.data import Data
-from torch_geometric.datasets import GNNBenchmarkDataset
 from pathlib import Path
 
 
 def get_cmap(n, name='hsv'):
-    '''Returns a function that maps each index in 0, 1, ..., n-1 to a distinct 
-    RGB color; the keyword argument name must be a standard mpl colormap name.'''
     return plt.cm.get_cmap(name, n)
 
 def visualiseWeights(nodes, weights, path=None, l=None):
@@ -50,9 +47,7 @@ def visualiseWeights(nodes, weights, path=None, l=None):
     if path is not None:
         path = path.detach()
         splits = (path == 0).nonzero().flatten().tolist()
-        # print(path)
-        # print(splits)
-        # print(splits.nonzero().flatten().tolist())
+
         sub_paths = [path[splits[cur]:splits[cur+1]].tolist() for cur in range(len(splits)-1)]
         sub_paths = [path for path in sub_paths if len(path) > 1]
         # print(sub_paths)
@@ -89,7 +84,7 @@ def convert_to_pyg_format(distances, demands, k_sparse=None):
         distances = torch.zeros_like(distances)
         distances[row_indices, nearest_k_inds] = nearest_k_values
 
-    x = nodes
+    x = demands
     edge_data = distances.to_sparse()
     edge_index = edge_data.indices()
     edge_attr = edge_data.values().reshape(-1, 1)

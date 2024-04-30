@@ -59,12 +59,9 @@ class ACO:
 
     def generate_best_path(self):
         paths, costs, _ = self.generate_paths_and_costs()
-        # print(paths.shape, costs.shape)
         min_index = torch.argmin(costs).item()
         best_path = paths[min_index]
-        # print(best_path.shape)
         return best_path
-
 
     @torch.no_grad()
     def generate_path_costs(self, paths):

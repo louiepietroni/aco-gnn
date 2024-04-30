@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import neuralnetwork
 from tqdm import trange
 import random
-from cvrputils import generate_dataset, visualiseWeights, load_dataset, generate_problem_instance, generate_variable_dataset
+from utils import generate_dataset, visualiseWeights, load_dataset, generate_problem_instance, generate_variable_dataset
 
 
 def evaluate_iteration(network, instance_data, distances, demands, n_ants, k_sparse=None):
@@ -71,17 +71,11 @@ def validate(network, problem_size, n_ants, k_sparse=None):
     validation_data = torch.mean(validation_data, dim=0)
     return validation_data
 
-def validate_best_variable(network, min_problem_size, max_problem_size, n_ants, k_sparse=None, avg=True):
-    # dataset = load_variable_dataset('test', min_problem_size, max_problem_size)
-    dataset = test_dataset
-    capacities = test_capacities
+def validate_dataset(network, dataset, capacities, n_ants, k_sparse=None, avg=True):
     validation_data = []
     for i, (coords, demands) in enumerate(dataset):
-        # print(i)
-        # print(i, capacities[i])
         pyg_data, distances = get_instance_data(coords, demands, k_sparse)
         iteration_data = evaluate_iteration_best(network, pyg_data, distances, n_ants, demands, capacities[i])
-        # iteration_data = evaluate_iteration_best(network, pyg_data, distances, n_ants, demands, 50)
         validation_data.append(iteration_data)
     if avg:
         return sum(validation_data)/len(validation_data)
@@ -193,11 +187,6 @@ def train_variable(network, min_problem_size, max_problem_size, epochs, iteratio
             problem_size = random.randint(min_problem_size, max_problem_size)
             coords, demands = generate_problem_instance(problem_size)
             pyg_data, distances = get_instance_data(coords, demands)
-            # # Generate distance matrix
-            # distances = torch.sqrt(((coords[:, None] - coords[None, :]) ** 2).sum(2))
-            # distances[torch.arange(problem_size+1), torch.arange(problem_size+1)] = 1e9
-            # distances[0, 0] = 1e-10
-            # pyg_data = convert_to_pyg_format(coords, distances, demands)
 
             cap = 30
             if min_cap is not None and max_cap is not None:
@@ -206,79 +195,3 @@ def train_variable(network, min_problem_size, max_problem_size, epochs, iteratio
             train_iteration(network, optimiser, pyg_data, distances, demands, n_ants, k_sparse=k_sparse, cap=cap)
 
 
-# heuristic_network = neuralnetwork.GNN(32, 12)
-# # heuristic_network = neuralnetwork.GNN(40, 20)
-# problem_size = 25
-# k_sparse = None
-# epochs = 10
-# iterations_per_epoch = 100
-# # iterations_per_epoch = 200
-# n_ants = 15
-# train(heuristic_network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=k_sparse)
-
-# heuristic_network.eval()
-# costs_base = []
-# costs_heu = []
-
-costs = []
-SIGNIFICANCE_RUNS = 15
-min_problem_size = 20
-max_problem_size = 50
-epochs = 10
-iterations_per_epoch = 1500
-n_ants = 15
-
-min_cap = 10
-max_cap = 50
-
-if False:
-    test_dataset = generate_variable_dataset('test', min_problem_size, max_problem_size, 45)
-    order = torch.randperm(len(test_dataset))
-    test_dataset = [test_dataset[i] for i in order]
-    test_capacities = [[x for _ in range(35)] for x in range(min_cap, max_cap + 5, 5)]
-    test_capacities = torch.tensor(test_capacities).flatten().tolist()
-    print('starting')
-
-    heuristic_network = neuralnetwork.GNN(32, 12)
-    train_variable(heuristic_network, min_problem_size, max_problem_size, 1, iterations_per_epoch, n_ants)
-    print('trained 30')
-    heuristic_network.eval()
-    data_30 = validate_best_variable(heuristic_network, min_problem_size, max_problem_size, n_ants, avg=False)
-    print('evaluated 30')
-    torch.save(torch.tensor(data_30), f'results/cvrp/caps-30.pt')
-
-    heuristic_network = neuralnetwork.GNN(32, 12)
-    train_variable(heuristic_network, min_problem_size, max_problem_size, 1, iterations_per_epoch, n_ants, min_cap=10, max_cap=50)
-    print('trained 10-50')
-    heuristic_network.eval()
-    data_10_50 = validate_best_variable(heuristic_network, min_problem_size, max_problem_size, n_ants, avg=False)
-    print('evaluated 10-50')
-    torch.save(torch.tensor(data_10_50), f'results/cvrp/caps-10-50.pt')
-
-
-    data_base = validate_best_variable(None, min_problem_size, max_problem_size, n_ants, avg=False)
-    print('evaluated base')
-    torch.save(torch.tensor(data_base), f'results/cvrp/caps-base.pt')
-
-
-data_30 = torch.load('results/cvrp/caps-30.pt')
-data_10_100 = torch.load('results/cvrp/caps-10-50.pt')
-data_base = torch.load('results/cvrp/caps-base.pt')
-
-fig, ax = plt.subplots()
-x = [i for i in range(min_cap, max_cap+5, 5)]
-
-for data, name in [(data_30, 'Model trained with capacity 30'), (data_10_100, 'Model trained with capacity 10-50'), (data_base, 'Expert heuristic')]:
-    data = data.reshape((-1, 35))
-    mean = data.mean(dim=1)
-    std = data.std(dim=1)
-    delta = 2.021 * std / (35 ** 0.5)
-    ax.plot(x, mean, label=f'{name}')
-    ax.fill_between(x, (mean-delta), (mean+delta), alpha=.2)
-
-
-plt.xlabel('Vehicle Capacity')
-plt.ylabel('Objective value')
-plt.legend()
-plt.title(f'Objective value against vehicle capacities')
-plt.show()

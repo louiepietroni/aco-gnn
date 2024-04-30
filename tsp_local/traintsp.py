@@ -272,36 +272,3 @@ plt.ylabel('Path Length')
 plt.legend()
 plt.title(f'TSP {problem_size}')
 plt.show()
-
-#  # Extrapolate
-# costs_base = []
-# costs_heu = []
-
-# for _ in range(10):
-#     data, distances = generate_problem_instance(problem_size * 2)
-#     sim = ACO(15, distances)
-#     sim.run(50)
-#     costs_base.append(sim.costs)
-
-#     heuristic_vector = heuristic_network(data)
-#     heuristics = reshape_heuristic(heuristic_vector, data)
-#     sim_heu = ACO(15, distances, heuristics=heuristics)
-#     sim_heu.run(50)
-#     costs_heu.append(sim_heu.costs)
-
-# costs_base = np.column_stack(tuple(costs_base))
-# costs_heu = np.column_stack(tuple(costs_heu))
-
-# fig, ax = plt.subplots()
-# ax.plot(np.mean(costs_base, axis=1), label='Base')
-# ax.plot(np.mean(costs_heu, axis=1), label='Heu')
-
-# plt.xlabel('No. Iterations')
-# plt.ylabel('Path Length')
-# plt.legend()
-# plt.title(f'TSP Extrapolated')
-# plt.show()
-# print(validate(heuristic_network, problem_size, n_ants, k_sparse))
-
-# tensor([25.4107, 28.4728, 21.8531, 24.5720])
-# tensor([10.0983, 11.0960,  9.2747, 10.1606])

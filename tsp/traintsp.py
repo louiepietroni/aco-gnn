@@ -41,6 +41,31 @@ def evaluate_iteration_best(network, instance_data, distances, n_ants, k_sparse=
     acoInstance.run(100, verbose=False)
     return acoInstance.best_cost
 
+def evaluate_iteration_best_vary_evap(network, instance_data, distances, n_ants, evap, k_sparse=None):
+    heuristics=None
+    if network is not None:
+        network.eval()
+        heuristic_vector = network(instance_data)
+        heuristics = reshape_heuristic(heuristic_vector, instance_data)
+    
+    acoInstance = ACO(n_ants, distances, heuristics=heuristics, evaportation_rate=evap)
+    acoInstance.run(100, verbose=False)
+    return acoInstance.best_cost
+
+def validate_best_variable_vary_evap(network, min_problem_size, max_problem_size, n_ants, evap, avg=True, k_sparse=None):
+    # dataset = load_variable_dataset('test_50_2', min_problem_size, max_problem_size, quantity=50)
+    dataset = load_variable_dataset('test', min_problem_size, max_problem_size, quantity=5)
+    validation_data = []
+
+    for instance_nodes in dataset:
+        pyg_data, distances = get_instance_data(instance_nodes, k_sparse)
+        iteration_data = evaluate_iteration_best_vary_evap(network, pyg_data, distances, n_ants, evap)
+        validation_data.append(iteration_data)
+    if avg:
+        return sum(validation_data)/len(validation_data)
+    else:
+        return validation_data
+
 def get_instance_data(nodes, k_sparse=None):
     size = nodes.size()[0]
     distances = torch.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))

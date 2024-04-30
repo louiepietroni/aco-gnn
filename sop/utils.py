@@ -126,10 +126,3 @@ def load_variable_dataset(dataset_type, min_problem_size, max_problem_size, step
 
 
 generate_variable_dataset('test', 20, 50, 5)
-
-# size = 5
-# nodes, precedences = generate_problem_instance(size, 1)
-# distances = torch.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))
-# distances[torch.arange(size), torch.arange(size)] = 1e9
-# print(precedences)
-# visualiseWeights(nodes, 1/distances, precedences)

@@ -14,13 +14,8 @@ class ACO:
         self.evaporation_rate = evaportation_rate
         self.distances = distances
         self.clauses = clauses
-        # Our basic heuristic is either:
-        # 1: Heuristic for nodes which DON'T share a clause with this variable
+        # heuristic for nodes which DON'T share a clause with this variable
         self.heuristics = heuristics+1e-7 if heuristics is not None else 1-distances + 0.1
-        # 2: Heuristic for nodes which share a clause for the negation of this variable
-        # self.heuristics = heuristics if heuristics is not None else 1-distances + 0.1
-        # 3: Heuristics for number of clauses a variable is in
-        # self.heuristics[:, 0] = 1e-9
         self.pheromones = torch.ones_like(distances)
         self.costs = []
     
@@ -50,7 +45,6 @@ class ACO:
 
             # Deposit pheromones proportional to the cost of the path
             self.pheromones[ant_path_starts, ant_path_ends] += 1./(1+ant_path_cost)
-            # self.pheromones[ant_path_ends, ant_path_starts] += 1./ant_path_cost
     
 
     def generate_paths_and_costs(self, gen_probs=False):
@@ -60,10 +54,8 @@ class ACO:
 
     def generate_best_path(self):
         paths, costs, _ = self.generate_paths_and_costs()
-        # print(paths.shape, costs.shape)
         min_index = torch.argmin(costs).item()
         best_path = paths[min_index]
-        # print(best_path.shape)
         return best_path
 
 
@@ -77,42 +69,6 @@ class ACO:
             unsatisfied_clauses[i] = ant_number_unsat_clauses
         return unsatisfied_clauses
 
-
-        print(paths)
-        print(torch.unique(paths, dim=1))
-        print(torch.unique_consecutive(paths, dim=1))
-
-        nonzero_indices = torch.nonzero(paths)
-
-        # Find the last non-zero index in each row
-        last_nonzero_index = torch.unique(nonzero_indices[:, 0])[1]
-        print('ahe')
-        print(last_nonzero_index)
-
-        zeros = paths != 0
-        print(zeros)
-
-        nonzero_indices = torch.nonzero(paths, as_tuple=True)
-        print(nonzero_indices)
-        # Get the last non-zero index in each row
-        last_nonzero_index = nonzero_indices.max(dim=0)
-        print('Paths')
-        print(paths)
-        print(nonzero_indices)
-        print(last_nonzero_index)
-
-        print()
-
-
-        # print(paths)
-        hop_starts = paths
-        hop_ends = torch.roll(hop_starts, -1, dims=1)
-        # costs = torch.sum(self.distances[hop_starts, hop_ends], dim=1) # #ants x 1
-        # return costs
-        # print(hop_starts)
-        # print(hop_ends)
-        # print(self.distances[hop_starts[:, :-1], hop_ends[:, :-1]])
-        return torch.sum(self.distances[hop_starts[:, :-1], hop_ends[:, :-1]], dim=1)
 
     def update_mask(self, mask, current_positions):
         mask[torch.arange(self.n_ants), current_positions] = 0 # Places just visited now not valid
@@ -134,7 +90,6 @@ class ACO:
     
     def generate_paths(self, gen_probs=False):
         current_positions = torch.randint(low=0, high=1, size=(self.n_ants,))
-        # current_positions = torch.zeros((self.n_ants,))
         valid_mask = torch.ones(size=(self.n_ants, self.n_nodes))
 
 
@@ -142,7 +97,6 @@ class ACO:
         path_log_probs = torch.zeros_like(paths) # #ants x 1
         path_log_probs = []
 
-        # while not self.done(valid_mask, current_positions):
         for _ in range(self.n_nodes//2):
             # print(_)
             valid_mask = valid_mask.clone()
@@ -152,7 +106,7 @@ class ACO:
             current_positions = next_positions
             paths = torch.hstack((paths, current_positions.reshape(self.n_ants, 1))) # #ants x (2, 3, ..., #nodes)
             path_log_probs.append(next_log_probs)
-        # print(paths)
+
         if gen_probs:
             path_log_probs = torch.stack(path_log_probs)
 
@@ -164,27 +118,12 @@ class ACO:
         move_heuristics = self.heuristics[current_positions]
         move_pheromones = self.pheromones[current_positions]
 
-        # move_heuristics = self.sizes.t().repeat(self.n_ants, 1)
-        # move_heuristics[:, 0] = 1e-9
-
         # Build the probabilities for each of these positions 
         move_probabilities = move_heuristics ** self.alpha * move_pheromones ** self.beta * valid_mask # #ants x #nodes
-        # print('NAN', move_heuristics.isnan().any())
-        # exit()
-        # print(move_heuristics)
-        # print(move_pheromones)
-        # print(valid_mask)
-        # print(move_probabilities)
 
         # Generate random indices (moves) based on the probabilities
-        # print(move_probabilities)
-        # try:
+
         moves = torch.multinomial(move_probabilities, 1).squeeze()
-        # except RuntimeError:
-        #     print(move_heuristics)
-        #     print(move_pheromones)
-        #     print(valid_mask)
-        #     print(move_probabilities)
 
         log_probabilites = None
         if gen_probs:
@@ -200,8 +139,6 @@ def example_run():
     clauses = generate_problem_instance(size)
     distances = get_distances(clauses, size)
 
-    # distances[torch.arange(size+1), torch.arange(size+1)] = 1e9
-    # distances[0, 0] = 1e-10
 
     costs = []
     for _ in range(5):

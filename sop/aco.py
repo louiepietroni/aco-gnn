@@ -56,7 +56,6 @@ class ACO:
 
             # Deposit pheromones proportional to the cost of the path
             self.pheromones[ant_path_starts[:-1], ant_path_ends[:-1]] += 1./ant_path_cost
-            # self.pheromones[ant_path_ends, ant_path_starts] += 1./ant_path_cost
     
 
     def generate_paths_and_costs(self, gen_probs=False):
@@ -81,18 +80,15 @@ class ACO:
         return costs
     
     def update_precedence_mask(self, positions, precendence_mask, precedence_helper):
-        # #ants x #nodes - are all precedences met for that ant to go to that node
-        # print(self.precedences)
-        # print(precendence_mask)
-        # print(positions)
+
         precedence_helper += self.precedences[positions].int() # We have made one more contribution to precedences in cur. positions
-        # print(precedence_helper)
+
         a = torch.sum(self.precedences, dim=0).repeat(self.n_ants, 1)
-        # print(a)
+
         inds = precedence_helper ==  a
-        # print(inds)
+
         precendence_mask[inds] = 1
-        # print(precendence_mask)
+
         return precendence_mask, precedence_helper
 
 
@@ -103,7 +99,6 @@ class ACO:
         current_positions = torch.randint(low=0, high=1, size=(self.n_ants,))
         valid_mask = torch.ones(size=(self.n_ants, self.n_nodes))
 
-        # precendence_mask = torch.zeros(size=(self.n_ants, self.n_nodes))
         precendence_mask = ~torch.any(self.precedences, dim=0)
         precendence_mask = precendence_mask.repeat(self.n_ants, 1).int()
         precendence_helper = torch.zeros_like(precendence_mask) # Will help
@@ -147,14 +142,14 @@ class ACO:
 
         return moves, log_probabilites
 
-# def example_run():
-#     size = 20
-#     nodes, precedences = generate_problem_instance(size, 0.01)
-#     distances = torch.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))
-#     distances[torch.arange(size), torch.arange(size)] = 1e9
-#     print(precedences)
-#     sim = ACO(3, distances, precedences)
-#     sim.run(20)
-#     visualiseWeights(nodes, sim.heuristics*sim.pheromones, precedences=precedences, path=sim.generate_best_path())
+def example_run():
+    size = 20
+    nodes, precedences = generate_problem_instance(size, 0.01)
+    distances = torch.sqrt(((nodes[:, None] - nodes[None, :]) ** 2).sum(2))
+    distances[torch.arange(size), torch.arange(size)] = 1e9
+    print(precedences)
+    sim = ACO(3, distances, precedences)
+    sim.run(20)
+    visualiseWeights(nodes, sim.heuristics*sim.pheromones, precedences=precedences, path=sim.generate_best_path())
 
 # example_run()

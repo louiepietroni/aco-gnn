@@ -50,7 +50,6 @@ class ACO:
 
             # Deposit pheromones proportional to the cost of the path
             self.pheromones[ant_path_starts[:-1], ant_path_ends[:-1]] += 1./ant_path_cost
-            # self.pheromones[ant_path_ends, ant_path_starts] += 1./ant_path_cost
     
 
     def generate_paths_and_costs(self, gen_probs=False):
@@ -75,10 +74,6 @@ class ACO:
             ant_tour_length = len(torch.unique_consecutive(paths[i]))
             ant_vertices_used = ant_tour_length - 2 # Ignore the dummy node on either end
             vertices_used[i] = ant_vertices_used
-        # print('PATHS')
-        # print(paths)
-        # print('vertices USED')
-        # print(vertices_used)
 
         return vertices_used
     
@@ -96,23 +91,6 @@ class ACO:
         covered_all_edges = (covered_edges == True).all()
         at_depot = (current_positions == 0).all()
         return covered_all_edges and at_depot
-
-    
-    def update_capacity_mask(self, current_positions, used_capacity):
-        # Any nodes which have edges to where we are now can't be visited
-        # If we're at the depot, reset to allow all nodes
-        capacity_mask = torch.ones(size=(self.n_ants, self.n_nodes))
-        # update capacity
-        used_capacity[current_positions==0] = 0
-        used_capacity = used_capacity + self.sizes[current_positions]
-        # update capacity_mask
-        remaining_capacity = self.capacity - used_capacity # (n_ants,)
-        remaining_capacity_repeat = remaining_capacity.repeat(1, self.n_nodes) # (n_ants, p_size)
-        demand_repeat = self.sizes.t().repeat(self.n_ants, 1) # (n_ants, p_size)
-
-        capacity_mask[demand_repeat > remaining_capacity_repeat] = 0
-        
-        return used_capacity, capacity_mask
     
     def update_covered_edges(self, covered_edges, current_positions):
         positions_expanded = current_positions.unsqueeze(0).t().expand(-1, self.edge_nodes.size()[2]) # Expand to #ants x #edges
@@ -125,7 +103,6 @@ class ACO:
         current_positions = torch.randint(low=0, high=1, size=(self.n_ants,))
         # current_positions = torch.zeros((self.n_ants,))
         valid_mask = torch.ones(size=(self.n_ants, self.n_nodes))
-        # used_capacity, capacity_mask = self.update_capacity_mask(current_positions, used_capacity)
         covered_edges = torch.zeros(size=(self.n_ants, self.edge_nodes.size()[2]))
 
 
@@ -134,8 +111,6 @@ class ACO:
         path_log_probs = []
 
         while not self.done(covered_edges, current_positions):
-            # print('Starting move')
-            # print(covered_edges, 'covered edges')
             valid_mask = valid_mask.clone()
             valid_mask = self.update_mask(valid_mask, current_positions, covered_edges)
 
@@ -144,7 +119,7 @@ class ACO:
             paths = torch.hstack((paths, current_positions.reshape(self.n_ants, 1))) # #ants x (2, 3, ..., #nodes)
             path_log_probs.append(next_log_probs)
             covered_edges = self.update_covered_edges(covered_edges, current_positions)
-        # print(paths)
+
         if gen_probs:
             path_log_probs = torch.stack(path_log_probs)
 
@@ -156,32 +131,16 @@ class ACO:
         move_heuristics = self.heuristics[current_positions] 
         move_pheromones = self.pheromones[current_positions]
 
-        # move_heuristics = self.sizes.t().repeat(self.n_ants, 1)
-        # move_heuristics[:, 0] = 1e-9
-
         # Build the probabilities for each of these positions 
         move_probabilities = move_heuristics ** self.alpha * move_pheromones ** self.beta * valid_mask # #ants x #nodes
-        # print('NAN', move_heuristics.isnan().any())
-        # exit()
-        # print('STARTING MOVE')
-        # print(move_heuristics)
-        # print(move_pheromones)
-        # print(valid_mask)
-        # print(move_probabilities)
 
         # Generate random indices (moves) based on the probabilities
-        # print(move_probabilities)
         try:
             moves = torch.multinomial(move_probabilities, 1).squeeze()
         except RuntimeError:
             print('Error encountered')
             move_probabilities = move_pheromones ** self.beta * valid_mask # #ants x #nodes
             moves = torch.multinomial(move_probabilities, 1).squeeze()
-
-            # print(move_heuristics)
-            # print(move_pheromones)
-            # print(valid_mask)
-            # print(move_probabilities)
 
         log_probabilites = None
         if gen_probs:

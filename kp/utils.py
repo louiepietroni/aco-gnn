@@ -67,17 +67,6 @@ def generate_problem_instance(size):
     
     return item_data
 
-
-# def get_distances(costs):
-#     size = costs.size()[0]
-#     distances = torch.zeros(size=(size, size)) # (1+#agents+#tasks) x (1+#agents+#tasks) #-1 as costs already includes the +1
-#     ratios = costs[1:, 0] / costs[1:, 1] # weights/values, smaller value = smaller distance = better
-#     distances[0, 1:] = ratios
-#     distances[1:, 0] = ratios
-#     # distances[0] = 1e-10
-#     # distances[:, 0] = 1e-10
-#     return distances
-
 def get_distances(costs):
     size = costs.size()[0]
     weights = torch.zeros(size=(size, size)) # (1+#agents+#tasks) x (1+#agents+#tasks) #-1 as costs already includes the +1
