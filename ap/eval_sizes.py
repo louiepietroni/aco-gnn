@@ -5,7 +5,7 @@ import matplotlib.pylab as plt
 import torch
 from utils import generate_variable_dataset, solve_dataset
 from trainap import train, train_variable, validate_dataset
-import graphnn.neuralnetwork as graphnn
+import graphnn.graphnn as graphnn
 
 
 costs = []

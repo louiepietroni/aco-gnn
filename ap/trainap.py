@@ -3,7 +3,6 @@ import numpy as np
 from aco import ACO
 from torch_geometric.data import Data
 import matplotlib.pyplot as plt
-import neuralnetwork
 from tqdm import trange
 import random
 from utils import generate_dataset, visualiseWeights, load_dataset, generate_problem_instance, get_distances, convert_to_pyg_format, generate_variable_dataset, solve_dataset
