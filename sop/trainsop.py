@@ -15,20 +15,8 @@ def evaluate_iteration(network, instance_data, distances, n_ants, k_sparse=None)
     heuristics = reshape_heuristic(heuristic_vector, instance_data)
     
     acoInstance = ACO(n_ants, distances, heuristics=heuristics)
-    _, initial_tour_costs, _ = acoInstance.generate_paths_and_costs() # Ignore paths and probs
-
-    acoInstance.run(10, verbose=False)
-    _, simulated_tour_costs, _ = acoInstance.generate_paths_and_costs() # Ignore paths and probs
-
-    initial_best_tour = torch.min(initial_tour_costs)
-    initial_mean_tour = torch.mean(initial_tour_costs)
-
-    simulated_best_tour = torch.min(simulated_tour_costs)
-    simulated_mean_tour = torch.mean(simulated_tour_costs)
-
-    iteration_validation_data = torch.tensor([initial_best_tour, initial_mean_tour, simulated_best_tour, simulated_mean_tour])
-
-    return iteration_validation_data
+    acoInstance.run(100, verbose=False)
+    return acoInstance.best_cost
 
 def evaluate_iteration_best(network, instance_data, distances, n_ants, precedences, k_sparse=None):
     network.eval()
@@ -47,19 +35,18 @@ def get_instance_data(nodes, precendeces, k_sparse=None):
     return pyg_data, distances
 
 
-
-def validate(network, problem_size, n_ants, k_sparse=None):
+def validate(network, problem_size, n_ants, k_sparse=None, avg=True):
     dataset = load_dataset('val', problem_size)
-    # dataset_size = dataset.size()[0]
     validation_data = []
     for instance_nodes in dataset:
         pyg_data, distances = get_instance_data(instance_nodes, k_sparse)
 
         iteration_data = evaluate_iteration(network, pyg_data, distances, n_ants)
         validation_data.append(iteration_data)
-    validation_data = torch.stack(validation_data)
-    validation_data = torch.mean(validation_data, dim=0)
-    return validation_data
+    if avg:
+        return sum(validation_data)/len(validation_data)
+    else:
+        return validation_data
 
 def validate_dataset(network, n_ants, dataset, avg=True):
     validation_data = []
@@ -85,17 +72,13 @@ def generate_path_costs(paths, distances):
 
 def plot_validation_data(validation_data):
     fig, ax = plt.subplots()
-    ax.plot(validation_data[:, 0], label='Best initial path cost')
-    ax.plot(validation_data[:, 1], label='Average initial path cost')
-    ax.plot(validation_data[:, 2], label='Best post simulation path cost')
-    ax.plot(validation_data[:, 3], label='Average post simulation path cost')
+    ax.plot(validation_data)
 
     plt.xlabel('Epoch')
-    plt.ylabel('Path Length')
+    plt.ylabel('Objective cost')
     plt.legend()
-    plt.title(f'Path Lengths per Epoch')
+    plt.title(f'Objective cost per Epoch')
     plt.show()
-    print(validation_data)
 
 
 def generateLoss(tour_costs, tour_log_probs):

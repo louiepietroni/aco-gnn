@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from aco import ACO
 from utils import load_dataset
 from trainm3s import train, get_distances, convert_to_pyg_format, reshape_heuristic
-import graphnn.neuralnetwork as graphnn
+import graphnn.graphnn as graphnn
 
 
 costs_base = []
@@ -22,6 +22,7 @@ test_dataset = load_dataset('test', problem_size)
 
 
 for _ in range(SIGNIFICANCE_RUNS):
+    continue
     heuristic_network = graphnn.GNN(32, 12, node_features=1)
     train(heuristic_network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=k_sparse)
 

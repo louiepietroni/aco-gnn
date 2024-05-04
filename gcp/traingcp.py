@@ -6,29 +6,6 @@ import matplotlib.pyplot as plt
 from tqdm import trange
 from utils import generate_dataset, visualiseWeights, load_dataset, generate_problem_instance, convert_to_pyg_format, get_distances
 
-
-def evaluate_iteration(network, instance_data, distances, n_ants, k_sparse=None):
-    network.eval()
-    heuristic_vector = network(instance_data)
-    heuristics = reshape_heuristic(heuristic_vector, instance_data)
-    
-    acoInstance = ACO(n_ants, distances, heuristics=heuristics)
-    _, initial_tour_costs, _ = acoInstance.generate_paths_and_costs() # Ignore paths and probs
-
-    acoInstance.run(10, verbose=False)
-    _, simulated_tour_costs, _ = acoInstance.generate_paths_and_costs() # Ignore paths and probs
-
-    initial_best_tour = torch.min(initial_tour_costs)
-    initial_mean_tour = torch.mean(initial_tour_costs)
-
-    simulated_best_tour = torch.min(simulated_tour_costs)
-    simulated_mean_tour = torch.mean(simulated_tour_costs)
-
-    iteration_validation_data = torch.tensor([initial_best_tour, initial_mean_tour, simulated_best_tour, simulated_mean_tour])
-
-    # return initial_best_tour, initial_mean_tour, simulated_best_tour, simulated_mean_tour
-    return iteration_validation_data
-
 def evaluate_iteration_best(network, instance_data, distances, n_ants, k_sparse=None):
     heuristics=None
     if network is not None:
@@ -43,10 +20,20 @@ def evaluate_iteration_best(network, instance_data, distances, n_ants, k_sparse=
         best_costs.append(acoInstance.best_cost)
     return best_costs
 
+def evaluate_iteration(network, instance_data, distances, n_ants, k_sparse=None):
+    heuristics=None
+    if network is not None:
+        network.eval()
+        heuristic_vector = network(instance_data)
+        heuristics = reshape_heuristic(heuristic_vector, instance_data)
+    
+    acoInstance = ACO(n_ants, distances, heuristics=heuristics)
+    acoInstance.run(1500, verbose=False)
+    return acoInstance.best_cost
 
-def validate(network, problem_size, n_ants, k_sparse=None):
+
+def validate(network, problem_size, n_ants, avg=True):
     dataset = load_dataset('val', problem_size)
-    # dataset_size = dataset.size()[0]
     validation_data = []
     for instance_nodes in dataset:
         distances = get_distances(instance_nodes, problem_size)
@@ -54,10 +41,10 @@ def validate(network, problem_size, n_ants, k_sparse=None):
 
         iteration_data = evaluate_iteration(network, pyg_data, distances, n_ants)
         validation_data.append(iteration_data)
-    validation_data = torch.stack(validation_data)
-    validation_data = torch.mean(validation_data, dim=0)
-    return validation_data
-
+    if avg:
+        return sum(validation_data)/len(validation_data)
+    else:
+        return validation_data
 
 
 def generate_path_costs(paths, distances):
@@ -73,15 +60,12 @@ def generate_path_costs(paths, distances):
 
 def plot_validation_data(validation_data):
     fig, ax = plt.subplots()
-    ax.plot(validation_data[:, 0], label='Best initial path cost')
-    ax.plot(validation_data[:, 1], label='Average initial path cost')
-    ax.plot(validation_data[:, 2], label='Best post simulation path cost')
-    ax.plot(validation_data[:, 3], label='Average post simulation path cost')
+    ax.plot(validation_data)
 
     plt.xlabel('Epoch')
-    plt.ylabel('Path Length')
+    plt.ylabel('Objective cost')
     plt.legend()
-    plt.title(f'Path Lengths per Epoch')
+    plt.title(f'Objective cost per Epoch')
     plt.show()
     print(validation_data)
 
@@ -123,8 +107,8 @@ def train_iteration(network, optimiser, instance_data, distances, n_ants, k_spar
 
 def train(network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=None, lr=1e-4):
     optimiser = torch.optim.AdamW(network.parameters(), lr=lr)
-    validation_data = []
-    validation_data.append(validate(network, problem_size, n_ants, k_sparse))
+    # validation_data = []
+    # validation_data.append(validate(network, problem_size, n_ants))
     for epoch in range(epochs):
         for _ in (pbar := trange(iterations_per_epoch)):
             edges = generate_problem_instance(problem_size, p=0.2)
@@ -133,9 +117,8 @@ def train(network, problem_size, epochs, iterations_per_epoch, n_ants, k_sparse=
 
             train_iteration(network, optimiser, pyg_data, distances, n_ants, k_sparse=k_sparse)
             pbar.set_description(f'Epoch {epoch+1}')
-        validation_data.append(validate(network, problem_size, n_ants, k_sparse))
-    validation_data = torch.stack(validation_data)
-    plot_validation_data(validation_data)
+    #     validation_data.append(validate(network, problem_size, n_ants))
+    # plot_validation_data(validation_data)
 
 
 

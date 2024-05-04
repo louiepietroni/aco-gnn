@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from utils import load_dataset
 from aco import ACO
 from trainkp import train, get_distances, reshape_heuristic, convert_to_pyg_format
-import graphnn.neuralnetwork as graphnn
+import graphnn.graphnn as graphnn
 
 
 problem_size = 100

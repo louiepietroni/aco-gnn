@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from utils import load_dataset
 from aco import ACO
-import graphnn.neuralnetwork as graphnn
+import graphnn.graphnn as graphnn
 from traintsp import train_variable, validate_best_variable_vary_evap, train, validate_best, validate_best_variable_vary_ab, validate_best_variable
 
 problem_size = 50

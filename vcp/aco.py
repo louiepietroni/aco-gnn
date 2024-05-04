@@ -23,6 +23,7 @@ class ACO:
         self.constraints = 1 - distances # 1 for all valid nodes to visit from i
         # Will create a 2 x #ants x #edges matrix. Values in each plane are corresponing vertices of an edge
         self.edge_nodes = torch.stack((edges[:, 0].expand(n_ants, -1), edges[:, 1].expand(n_ants, -1)))
+        self.best_cost = torch.inf
     
     @torch.no_grad()
     def run(self, n_iterations, verbose=True):
@@ -39,6 +40,9 @@ class ACO:
         paths, path_costs, _ = self.generate_paths_and_costs() # We disregard the probs here, not needed
         self.update_pheromones(paths, path_costs)
         self.costs.append(torch.mean(path_costs).item())
+
+        best_iteration_cost = torch.min(path_costs).item()
+        self.best_cost = min(best_iteration_cost, self.best_cost)
     
     @torch.no_grad()
     def update_pheromones(self, paths, path_costs):

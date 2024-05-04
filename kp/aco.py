@@ -20,7 +20,7 @@ class ACO:
         self.weights = weights
         self.values = values
         self.total_value = self.values[0].sum()
-        # print(self.total_value)
+        self.best_cost = 0
     
     @torch.no_grad()
     def run(self, n_iterations, verbose=True):
@@ -37,6 +37,9 @@ class ACO:
         paths, path_costs, _ = self.generate_paths_and_costs() # We disregard the probs here, not needed
         self.update_pheromones(paths, path_costs)
         self.costs.append(torch.mean(path_costs).item())
+
+        best_iteration_cost = torch.min(path_costs).item()
+        self.best_cost = max(best_iteration_cost, self.best_cost)
     
     @torch.no_grad()
     def update_pheromones(self, paths, path_costs):
@@ -68,7 +71,6 @@ class ACO:
 
     @torch.no_grad()
     def generate_path_costs(self, paths):
-        # print(paths)
         hop_starts = paths
         hop_ends = torch.roll(hop_starts, -1, dims=1)
         return torch.sum(self.values[hop_starts[:, :-1], hop_ends[:, :-1]], dim=1) / 2 # Halved as there and back cost
@@ -76,7 +78,6 @@ class ACO:
     def update_mask(self, mask, current_positions):
         mask[torch.arange(self.n_ants), current_positions] = 0 # Places just visited now not valid
         mask[:, 0] = 1 # Can always visit the dummy node
-        inidices_at_depot = current_positions == 0
         return mask
     
     def done(self, valid_mask, current_positions):
